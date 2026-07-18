@@ -1,0 +1,139 @@
+\begin{thebibliography}{21}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[{Bolya et~al.(2023)Bolya, Fu, Dai, Zhang, Feichtenhofer, and
+  Hoffman}]{bolya2023tome}
+Bolya, D.; Fu, C.-Y.; Dai, X.; Zhang, P.; Feichtenhofer, C.; and Hoffman, J.
+  2023.
+\newblock Token Merging: Your {ViT} But Faster.
+\newblock In \emph{International Conference on Learning Representations}.
+
+\bibitem[{Chen et~al.(2024{\natexlab{a}})Chen, Zhao, Cai, Cao, Gu
+  et~al.}]{chen2024fastv}
+Chen, L.; Zhao, H.; Cai, T.; Cao, Y.; Gu, J.; et~al. 2024{\natexlab{a}}.
+\newblock An Image is Worth 1/2 Tokens After Layer 2: Plug-and-Play Inference
+  Acceleration for Large Vision-Language Models.
+\newblock \emph{arXiv preprint arXiv:2403.06764}.
+
+\bibitem[{Chen et~al.(2024{\natexlab{b}})Chen, Wu, Wang, Su, Chen, Xing, Zhong,
+  Zhang, Zhu, Lu et~al.}]{chen2024internvl}
+Chen, Z.; Wu, J.; Wang, W.; Su, W.; Chen, G.; Xing, S.; Zhong, M.; Zhang, Q.;
+  Zhu, X.; Lu, L.; et~al. 2024{\natexlab{b}}.
+\newblock InternVL: Scaling up Vision Foundation Models and Aligning for
+  Generic Visual-Linguistic Tasks.
+\newblock \emph{arXiv preprint arXiv:2404.16821}.
+
+\bibitem[{Cui et~al.(2026)Cui, Sun, Liang, Gao, Zhang, Liu, Wang, Zhou, Liu,
+  Lin et~al.}]{cui2026paddleocrvl}
+Cui, C.; Sun, T.; Liang, S.; Gao, T.; Zhang, Z.; Liu, J.; Wang, X.; Zhou, C.;
+  Liu, H.; Lin, M.; et~al. 2026.
+\newblock Boosting Document Parsing Efficiency and Performance with
+  Coarse-to-Fine Visual Processing.
+\newblock \emph{arXiv preprint arXiv:2603.24326}.
+
+\bibitem[{Dong et~al.(2026)}]{dong2026qianfanocr}
+Dong, D.; et~al. 2026.
+\newblock Qianfan-OCR: A Unified End-to-End Model for Document Intelligence.
+\newblock \emph{arXiv preprint arXiv:2603.13398}.
+
+\bibitem[{He et~al.(2026)}]{dora2026}
+He, K.; et~al. 2026.
+\newblock DORA: Dynamic Online Reinforcement Agent for Token Merging in Vision
+  Transformers.
+\newblock \emph{arXiv preprint arXiv:2605.11683}.
+
+\bibitem[{others(2025{\natexlab{a}})}]{dycoke2025}
+others. 2025{\natexlab{a}}.
+\newblock DyCoke: Dynamic Compression of Tokens for Fast Video Large Language
+  Models.
+\newblock \emph{arXiv preprint arXiv:2411.15024}.
+
+\bibitem[{others(2025{\natexlab{b}})}]{gridprune2025}
+others. 2025{\natexlab{b}}.
+\newblock GridPrune: From ``Where to Look'' to ``What to Select'' in Visual
+  Token Pruning for MLLMs.
+\newblock \emph{arXiv preprint arXiv:2511.10081}.
+
+\bibitem[{others(2025{\natexlab{c}})}]{indexpreserving2025}
+others. 2025{\natexlab{c}}.
+\newblock Index-Preserving Lightweight Token Pruning for Efficient Document
+  Understanding in VLMs.
+\newblock \emph{arXiv preprint arXiv:2509.06415}.
+
+\bibitem[{others(2025{\natexlab{d}})}]{marc2025}
+others. 2025{\natexlab{d}}.
+\newblock MARC: Memory-Augmented RL Token Compression for Efficient Video
+  Understanding.
+\newblock \emph{arXiv preprint arXiv:2510.07915}.
+
+\bibitem[{others(2025{\natexlab{e}})}]{visionzip2025}
+others. 2025{\natexlab{e}}.
+\newblock VisionZip: Longer is Better but Not Necessary in Vision Language
+  Models.
+\newblock \emph{arXiv preprint arXiv:2412.04467}.
+
+\bibitem[{others(2026{\natexlab{a}})}]{idpruner2026}
+others. 2026{\natexlab{a}}.
+\newblock IDPruner: Harmonizing Importance and Diversity in Visual Token
+  Pruning for Large Vision-Language Models.
+\newblock \emph{arXiv preprint arXiv:2602.13315}.
+
+\bibitem[{others(2026{\natexlab{b}})}]{rtprune2026}
+others. 2026{\natexlab{b}}.
+\newblock RTPrune: Reading-Twice Inspired Token Pruning for Efficient
+  DeepSeek-OCR Inference.
+\newblock \emph{arXiv preprint arXiv:2605.00392}.
+
+\bibitem[{others(2026{\natexlab{c}})}]{visiontrim2026}
+others. 2026{\natexlab{c}}.
+\newblock VisionTrim: Unified Vision Token Compression for Training-Free MLLM
+  Acceleration.
+\newblock \emph{OpenReview}.
+
+\bibitem[{Rao et~al.(2021)Rao, Zhao, Liu, Lu, Zhou, and
+  Hsieh}]{rao2021dynamicvit}
+Rao, Y.; Zhao, W.; Liu, B.; Lu, J.; Zhou, J.; and Hsieh, C.-J. 2021.
+\newblock DynamicViT: Efficient Vision Transformers with Dynamic Token
+  Sparsification.
+\newblock In \emph{Advances in Neural Information Processing Systems}.
+
+\bibitem[{Shang et~al.(2024)Shang, Cai, Xu, Lee, and
+  Yan}]{shang2024llavaprumerge}
+Shang, Y.; Cai, M.; Xu, B.; Lee, Y.~J.; and Yan, Y. 2024.
+\newblock LLaVA-PruMerge: Adaptive Token Reduction for Efficient Large
+  Multimodal Models.
+\newblock \emph{arXiv preprint arXiv:2403.15388}.
+
+\bibitem[{Shao et~al.(2024)Shao, Wang, Zhu et~al.}]{shao2024deepseekmath}
+Shao, Z.; Wang, P.; Zhu, Q.; et~al. 2024.
+\newblock DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open
+  Language Models.
+\newblock \emph{arXiv preprint arXiv:2402.03300}.
+
+\bibitem[{Wang et~al.(2024)Wang, Bai, Tan, Wang, Fan, Bai, Chen, Liu, Wang, Ge
+  et~al.}]{wang2024qwen2vl}
+Wang, P.; Bai, S.; Tan, S.; Wang, S.; Fan, Z.; Bai, J.; Chen, K.; Liu, X.;
+  Wang, J.; Ge, W.; et~al. 2024.
+\newblock Qwen2-VL: Enhancing Vision-Language Model's Perception of the World
+  at Any Resolution.
+\newblock \emph{arXiv preprint arXiv:2409.12191}.
+
+\bibitem[{Wang et~al.(2026)Wang, Hua, Tao, Cao, and Xu}]{wang2026score}
+Wang, S.; Hua, Y.; Tao, Z.; Cao, H.; and Xu, L. 2026.
+\newblock Dynamic Token Compression for Efficient Video Understanding through
+  Reinforcement Learning.
+\newblock \emph{arXiv preprint arXiv:2603.26365}.
+
+\bibitem[{Wei et~al.(2024)Wei, Liu, Chen, Wang, Kong, Xu, Ge, Zhao, Sun, Peng
+  et~al.}]{wei2024got}
+Wei, H.; Liu, C.; Chen, J.; Wang, J.; Kong, L.; Xu, Y.; Ge, Z.; Zhao, L.; Sun,
+  J.; Peng, Y.; et~al. 2024.
+\newblock General OCR Theory: Towards OCR-2.0 via a Unified End-to-end Model.
+\newblock \emph{arXiv preprint arXiv:2409.01704}.
+
+\bibitem[{Wei, Sun, and Li(2025)}]{wei2025deepseekocr}
+Wei, H.; Sun, Y.; and Li, Y. 2025.
+\newblock DeepSeek-OCR: Contexts Optical Compression.
+\newblock \emph{arXiv preprint arXiv:2510.18234}.
+
+\end{thebibliography}

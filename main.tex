@@ -1,0 +1,85 @@
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2027}  % DO NOT CHANGE THIS
+\usepackage[hyphens]{url}  % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm}  % DO NOT CHANGE THIS
+\usepackage{natbib}  % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\frenchspacing  % DO NOT CHANGE THIS
+
+% Recommended packages
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{multirow}
+\usepackage{CJKutf8} % Temporary: remove before submission
+
+\usepackage[table]{xcolor}
+\pdfinfo{
+/TemplateVersion (2027.1)
+}
+
+\setcounter{secnumdepth}{0}
+
+% Custom commands
+\newcommand{\ours}{BlackHole Merge}
+\newcommand{\eg}{\emph{e.g.} }
+\newcommand{\ie}{\emph{i.e.} }
+\newcommand{\cf}{\emph{cf.} }
+\newcommand{\etc}{\emph{etc.} }
+
+\definecolor{cleanrow}{RGB}{246,246,246}
+\definecolor{encoderrow}{RGB}{232,245,233}
+\definecolor{llmrow}{RGB}{255,243,224}
+\definecolor{multistagerow}{RGB}{227,242,253}
+\definecolor{ocrrow}{RGB}{252,228,236}
+\definecolor{oursrow}{RGB}{237,231,246}
+
+\title{BlackHoleMerge: Content-Adaptive Token Merging for Document Parsing}
+\author{
+    Anonymous Submission
+}
+\affiliations{
+    Anonymous Institution
+}
+
+\makeatletter
+\let\old@maketitle\@maketitle
+\renewcommand{\@maketitle}{%
+  \old@maketitle%
+  \vspace{-35pt} % 大幅缩小标题与图片之间的间距
+  \begin{center}
+    \includegraphics[width=1\textwidth,keepaspectratio]{figures/final/begin_pic.pdf}
+    % \vspace{-5pt} % 缩小图片与题注之间的间距
+    \captionof{figure}{1}
+    \label{fig:cartoon}
+  \end{center}
+  % \vspace{-5pt} % 缩小图片下方与正文起始处的间距
+}
+\makeatother
+
+\begin{document}
+\begin{CJK}{UTF8}{gbsn}
+
+\maketitle
+
+\input{sec/0_abstract}
+\input{sec/1_intro}
+\input{sec/2_related}
+\input{sec/3_method}
+\input{sec/4_experiments}
+\input{sec/5_conclusion}
+
+\clearpage
+{
+    \small
+    \bibliography{references}
+}
+\end{CJK}
+\end{document}

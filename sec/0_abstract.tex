@@ -1,0 +1,7 @@
+\begin{abstract}
+High-resolution document VLMs usually encode thousands of visual tokens, while the information density of document pages is highly non-uniform: text, formulas, and tables carry most semantics, whereas blank and background regions occupy large areas. Fixed downsampling, token pruning, and fixed-ratio merging struggle to achieve high compression while preserving fine-grained document information.
+
+We propose BlackHole Merge, a content-adaptive visual token compression method. Our key observation is that the L2 norm of ViT Key vectors in pretrained document VLMs can serve as an annotation-free content density signal. BlackHole Merge keeps high-density tokens as absorbers at an intermediate ViT layer and merges low-density tokens into nearby absorbers according to K-vector similarity, shortening subsequent ViT layers and LLM inputs while preserving local information. Merge-aware SFT adapts the model to merged representations, and lightweight RL further learns sharper content-adaptive compression decisions.
+
+We validate BlackHole Merge on multiple end-to-end document VLM settings. Compared with the no-compression model, BlackHole Merge preserves nearly lossless parsing accuracy and achieves over 70\% average visual token compression on OmniDocBench v1.6, showing that content-adaptive compression effectively improves the efficiency of end-to-end document understanding.
+\end{abstract}
