@@ -53,21 +53,6 @@
     Anonymous Institution
 }
 
-\makeatletter
-\let\old@maketitle\@maketitle
-\renewcommand{\@maketitle}{%
-  \old@maketitle%
-  \vspace{-35pt} % 大幅缩小标题与图片之间的间距
-  \begin{center}
-    \includegraphics[width=0.81\textwidth,keepaspectratio]{figures/final/begin_pic.pdf}
-    % \vspace{-5pt} % 缩小图片与题注之间的间距
-    \captionof{figure}{1}
-    \label{fig:cartoon}
-  \end{center}
-  % \vspace{-5pt} % 缩小图片下方与正文起始处的间距
-}
-\makeatother
-
 \begin{document}
 \begin{CJK}{UTF8}{gbsn}
 

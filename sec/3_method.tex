@@ -16,11 +16,11 @@ Figure~\ref{fig:model_arch} shows the layered compression framework of \ours{}. 
 
 \subsubsection{K-norm Density Estimation.}
 
-In ViT self-attention, tokens $X\in\mathbb{R}^{N\times D}$ are projected as
+In ViT~\cite{dosovitskiy2021vit} self-attention, tokens $X\in\mathbb{R}^{N\times D}$ are projected as
 \begin{equation}
 Q=XW_Q, \quad K=XW_K, \quad V=XW_V,
 \end{equation}
-with attention weights $\mathrm{softmax}(QK^\top/\sqrt{d_k})$. Since Key vectors determine how strongly tokens can be matched in dot-product attention, their norms provide an empirical signal of content density. We verify this on 1{,}000 OCR documents spanning newspapers, papers, slides, and other page types. As shown in Table~\ref{tab:cross_model_knorm}, text regions consistently have higher K-norms than background regions across continuous layers, indicating a common representation pattern rather than a single-model artifact.
+with attention weights $\mathrm{softmax}(QK^\top/\sqrt{d_k})$. Since Key vectors determine how strongly tokens can be matched in dot-product attention, their norms provide an empirical signal of content density. We verify this on 1{,}000 OCR documents spanning newspapers, papers, slides, and other page types. As shown in Table~\ref{tab:cross_model_knorm}, across a broad range of OCR/document VLMs---PaddleOCR-VL~\cite{cui2026paddleocrvl}, dots.ocr~\cite{li2025dotsocr}, MinerU2-VLM~\cite{mineru2vlm2025}, HunyuanOCR~\cite{lyu2025hunyuanocr}, Dolphin~\cite{feng2025dolphin}, FireRed-OCR~\cite{wu2026firered}, and ABot-OCR~\cite{jiang2026abot}---text regions consistently have higher K-norms than background regions across continuous layers, indicating a common representation pattern rather than a single-model artifact.
 
 \begin{table}[!htbp]
     \centering
@@ -95,12 +95,14 @@ Here $\mathrm{sg}(d_j)$ controls only the forward merging strength, so gradients
 \subsubsection{Lightweight RL Policy.}
 In the second stage we freeze the ViT, projector, and LLM, and train only a lightweight policy MLP ($\sim$74K parameters) that refines the keep/drop boundary on top of the SFT density ordering. Given the full Key vector $k_i$, the policy predicts a logit-space correction:
 \begin{equation}
-\mathrm{correction}_i=\mathrm{MLP}(k_i),\qquad
-d_i'=\sigma\!\left(\mathrm{logit}(d_i)+\mathrm{correction}_i\right).
+\begin{aligned}
+\mathrm{correction}_i&=\mathrm{MLP}(k_i),\\
+d_i'&=\sigma\!\left(\mathrm{logit}(d_i)+\mathrm{correction}_i\right).
+\end{aligned}
 \end{equation}
 Observing the full Key vector lets the policy exploit directional information beyond the norm and distinguish tokens with similar norms but different semantics, reducing the gray zone ($0.3<d<0.6$) left by SFT.
 
-We train the policy with GRPO. For each sample, we draw $K=8$ keep/drop masks from $d_i'$ and evaluate each compressed sequence with teacher-forcing CE after BlackHole Merge. Instead of the uncompressed input, the reference is the CE under the SFT hard mask:
+We train the policy with GRPO~\cite{shao2024deepseekmath}. For each sample, we draw $K=8$ keep/drop masks from $d_i'$ and evaluate each compressed sequence with teacher-forcing CE after BlackHole Merge. Instead of the uncompressed input, the reference is the CE under the SFT hard mask:
 \begin{equation}
 \mathrm{CE}_{\mathrm{base}}
 =\mathrm{TeacherForcing}(\mathrm{SFT\ hard\ mask},\mathrm{GT}),

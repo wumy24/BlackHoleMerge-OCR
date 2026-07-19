@@ -4,13 +4,21 @@
 \subsection{Experimental Setup}
 
 \textbf{Models and protocol.}
-We study visual-token compression \emph{inside} document VLMs rather than training a new OCR foundation model, and evaluate \ours{} on PaddleOCR-VL-1.6, MinerU2-VLM, and dots.ocr. Since PaddleOCR-VL-1.6 and MinerU2-VLM originally use crop-based pipelines, we remove the external crop stage and run a single full-image VLM forward pass, so that the measured compression is attributable to the VLM alone; official pipeline results are kept only as reference points. For models with a fixed reduction projector or a fixed image-token placeholder layout, we adapt only the input protocol so that placeholders match the compressed sequence, leaving the projector and the VLM backbone unchanged.
+We study visual-token compression \emph{inside} document VLMs rather than training a new OCR foundation model, and evaluate \ours{} on PaddleOCR-VL-1.6~\cite{cui2026paddleocrvl}, MinerU2-VLM~\cite{mineru2vlm2025}, and dots.ocr~\cite{li2025dotsocr}. Since PaddleOCR-VL-1.6 and MinerU2-VLM originally use crop-based pipelines, we remove the external crop stage and run a single full-image VLM forward pass, so that the measured compression is attributable to the VLM alone; official pipeline results are kept only as reference points. For models with a fixed reduction projector or a fixed image-token placeholder layout, we adapt only the input protocol so that placeholders match the compressed sequence, leaving the projector and the VLM backbone unchanged.
 
 \textbf{Datasets and metrics.}
-Experiments are mainly conducted on OmniDocBench v1.6, using its official parsing metrics (TextEdit, Formula CDM, Table TEDS/TEDS\textsubscript{s}, Reading-Order Edit, and Overall). Efficiency is reported as input/retained visual tokens, ViT and prefill TFLOPs, and inference/training speed. Category-level compression is analyzed on OmniDocBench v1.6 and Real5-OmniDocBench, the latter covering five real-world degradations (scanning, warping, screen photography, illumination, and skew).
+Experiments are mainly conducted on OmniDocBench v1.6~\cite{ouyang2025omnidocbench}, using its official parsing metrics (TextEdit, Formula CDM, Table TEDS/TEDS\textsubscript{s}, Reading-Order Edit, and Overall). Efficiency is reported as input/retained visual tokens, ViT and prefill TFLOPs, and inference/training speed. Category-level compression is analyzed on OmniDocBench v1.6 and Real5-OmniDocBench, the latter covering five real-world degradations (scanning, warping, screen photography, illumination, and skew).
 
 \textbf{Compared methods.}
-We use three settings. (i) Public end-to-end parsing systems, to place the compressed model on the quality--efficiency frontier. (ii) Compression rules under the same host model and matched token budgets: from one no-merge SFT backbone we attach IDPrune-, ToMe-, and DivPrune-style operators as training-free baselines, whereas \ours{} enables BlackHole Merge (BHM) during SFT from the same initialization and further trains the lightweight RL policy. We say ``style'' because these baselines cannot be ported into a unified VLM-only path line-by-line—their official versions assume different architectures and token layouts—so we preserve their core principles: ToMe-style merges by feature similarity, DivPrune-style selects a diverse subset, and IDPrune-style ranks tokens by importance with diversity suppression.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/final/compare_5_method.pdf}
+\caption{Overview of \ours{}. A merge head at an intermediate ViT layer keeps high-density tokens and merges low-density ones by Key-vector density and similarity. Merge-aware SFT and lightweight RL refine the density boundary for stable content-adaptive compression.}
+\label{fig:model_arch}
+\end{figure*}
+
+We use three settings. (i) Public end-to-end parsing systems, to place the compressed model on the quality--efficiency frontier. (ii) Compression rules under the same host model and matched token budgets: from one no-merge SFT backbone we attach IDPrune-~\cite{idpruner2026}, ToMe-~\cite{bolya2023tome}, and DivPrune-style~\cite{alvar2025divprune} operators as training-free baselines, whereas \ours{} enables BlackHole Merge (BHM) during SFT from the same initialization and further trains the lightweight RL policy. We say ``style'' because these baselines cannot be ported into a unified VLM-only path line-by-line—their official versions assume different architectures and token layouts—so we preserve their core principles: ToMe-style merges by feature similarity, DivPrune-style selects a diverse subset, and IDPrune-style ranks tokens by importance with diversity suppression.
 
 \subsection{Quality--Efficiency Comparison}
 
@@ -18,13 +26,13 @@ Table~\ref{tab:full_unified_all} separates official pipelines, VLM-only baseline
 
 Table~\ref{tab:omnidocbench_compare} isolates the compression rule under a controlled VLM-only setting: the style baselines share the same no-merge SFT backbone at a matched token budget, while \ours{} uses merge-aware SFT and RL from the same initialization. Training-free styles collapse (Overall $<16$) because they were never trained on compressed sequences, and OCR demands a near-lossless token set; in contrast, BHM preserves quality, showing that adapting the backbone to the compression path is essential for document parsing.
 
-Table~\ref{tab:omnidocbench_compression} reports category-level compression. Values in parentheses are gains over the reference compression bound (the official fixed $4\times$ down-sampling budget of PaddleOCR-VL-1.6). The learned density is content-adaptive rather than layout-fixed: sparse or background-heavy categories obtain larger gains, while text-heavy layouts retain more tokens. The negative value on Magazine is consistent with this: magazine pages are visually dense with mixed text/graphics, so fewer tokens are safely removable than the fixed bound assumes. Qualitatively, text, formulas, tables, and layout boundaries are preferentially retained while blank regions are aggressively merged.
+Figure~\ref{fig:three_bench} reports category-level compression on three benchmarks (OmniDocBench v1.6, Real5-OmniDocBench, and PureDocBench). ``Ours Mean'' is the per-category average over the three host VLMs after training with \ours{}, and the $+$ labels next to each category are gains over the reference compression bound (the official fixed $4\times$ down-sampling budget of PaddleOCR-VL-1.6). The learned density is content-adaptive rather than layout-fixed: sparse or background-heavy categories obtain larger gains, while text-heavy layouts retain more tokens. The negative value on Magazine is consistent with this: magazine pages are visually dense with mixed text/graphics, so fewer tokens are safely removable than the fixed bound assumes. Across all three benchmarks the retained-token density stays above the fixed reference bound, confirming that the adaptive compression generalizes across document domains and capture conditions. Qualitatively, text, formulas, tables, and layout boundaries are preferentially retained while blank regions are aggressively merged.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.8\linewidth]{figures/final/compare_3_bench.pdf}
-\caption{1}
-\label{fig:model_arch}
+\caption{Category-level token compression on three benchmarks: OmniDocBench v1.6, Real5-OmniDocBench, and PureDocBench. ``Ours Mean'' is the per-category average over the three host VLMs (PaddleOCR-VL-1.6, MinerU2-VLM, and dots.ocr) after training with \ours{}, and ``GT BBox'' is the fixed reference compression bound. Numbers next to each category are the compression rate and its gain (+) over the reference bound; \ours{} stays above the bound across categories and benchmarks.}
+\label{fig:three_bench}
 \end{figure*}
 
 
