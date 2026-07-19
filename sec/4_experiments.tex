@@ -3,197 +3,137 @@
 
 \subsection{Experimental Setup}
 
-\textbf{Models and evaluation protocol.}
-This work studies visual token compression inside document VLMs, rather than training a new OCR foundation model. We evaluate \ours{} on PaddleOCR-VL-1.6, MinerU2-VLM, and dots.ocr. PaddleOCR-VL-1.6 and MinerU2-VLM originally contain crop-based pipelines. To isolate visual token compression inside the VLM, our compression experiments remove the external crop stage and use a single full-image VLM forward pass. Official pipeline results are kept as reference points for end-to-end performance.
-
-For models with a fixed reduction projector or a fixed image-token placeholder layout, we only adapt the input protocol so that placeholders match the compressed visual-token sequence. The projector parameters and the main VLM backbone are otherwise unchanged.
+\textbf{Models and protocol.}
+We study visual-token compression \emph{inside} document VLMs rather than training a new OCR foundation model, and evaluate \ours{} on PaddleOCR-VL-1.6, MinerU2-VLM, and dots.ocr. Since PaddleOCR-VL-1.6 and MinerU2-VLM originally use crop-based pipelines, we remove the external crop stage and run a single full-image VLM forward pass, so that the measured compression is attributable to the VLM alone; official pipeline results are kept only as reference points. For models with a fixed reduction projector or a fixed image-token placeholder layout, we adapt only the input protocol so that placeholders match the compressed sequence, leaving the projector and the VLM backbone unchanged.
 
 \textbf{Datasets and metrics.}
-Experiments are mainly conducted on OmniDocBench v1.6. Parsing quality is measured by TextEdit, Formula CDM, Table TEDS, Table TEDS\textsubscript{s}, Reading Order Edit, and Overall. Efficiency is measured by input visual tokens, retained visual tokens after compression, TFLOPS breakdown, inference speed, and training speed. We also report category-level compression statistics on OmniDocBench v1.6 and Real5-OmniDocBench to analyze content-adaptive behavior.
+Experiments are mainly conducted on OmniDocBench v1.6, using its official parsing metrics (TextEdit, Formula CDM, Table TEDS/TEDS\textsubscript{s}, Reading-Order Edit, and Overall). Efficiency is reported as input/retained visual tokens, ViT and prefill TFLOPs, and inference/training speed. Category-level compression is analyzed on OmniDocBench v1.6 and Real5-OmniDocBench, the latter covering five real-world degradations (scanning, warping, screen photography, illumination, and skew).
 
 \textbf{Compared methods.}
-We consider three comparison settings. First, we compare with public end-to-end document parsing systems to position the compressed model on the quality--efficiency frontier. Second, we compare compression rules under the same host model and matched token budgets. We first train a no-merge SFT backbone, and then attach IDPrune-style, ToMe-style, and DivPrune-style as training-free compression operators. In contrast, \ours{} starts from the same initialization, enables BlackHole Merge during SFT, and further trains the lightweight RL Policy.
-
-We use the term ``style'' because these baselines cannot be migrated into a unified VLM-only path as line-by-line equivalent implementations: their official versions depend on different architectures, insertion sites, and token-packing layouts. We therefore preserve their core compression principles instead of reproducing full official systems. ToMe-style merges removed tokens into retained tokens according to feature similarity, DivPrune-style performs diversity-based subset selection, and IDPrune-style selects tokens using visual-token importance with diversity suppression.
+We use three settings. (i) Public end-to-end parsing systems, to place the compressed model on the quality--efficiency frontier. (ii) Compression rules under the same host model and matched token budgets: from one no-merge SFT backbone we attach IDPrune-, ToMe-, and DivPrune-style operators as training-free baselines, whereas \ours{} enables BlackHole Merge (BHM) during SFT from the same initialization and further trains the lightweight RL policy. We say ``style'' because these baselines cannot be ported into a unified VLM-only path line-by-line—their official versions assume different architectures and token layouts—so we preserve their core principles: ToMe-style merges by feature similarity, DivPrune-style selects a diverse subset, and IDPrune-style ranks tokens by importance with diversity suppression.
 
 \subsection{Quality--Efficiency Comparison}
 
-Figure~\ref{fig:performance} compares \ours{} with representative end-to-end document parsing systems. This comparison positions the compressed model on the quality--efficiency frontier. The following tables further separate official pipelines, VLM-only baselines, and BHM-compressed VLMs.
+Table~\ref{tab:full_unified_all} separates official pipelines, VLM-only baselines, and BHM-compressed VLMs. Fixed reduction in official pipelines mainly cuts tokens \emph{after} the visual encoder, whereas BHM cuts them \emph{inside} the encoder. For PaddleOCR-VL-1.6, BHM reduces the visual sequence from 4954 to about 1400 retained tokens, lowering both later-ViT and LLM-prefill cost while keeping parsing quality competitive.
 
-% Preamble:
-% \usepackage{booktabs}
-% \usepackage{multirow}
-% \usepackage{array}
-% \newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
-% \newcolumntype{L}[1]{>{\raggedright\arraybackslash}m{#1}}
+Table~\ref{tab:omnidocbench_compare} isolates the compression rule under a controlled VLM-only setting: the style baselines share the same no-merge SFT backbone at a matched token budget, while \ours{} uses merge-aware SFT and RL from the same initialization. Training-free styles collapse (Overall $<16$) because they were never trained on compressed sequences, and OCR demands a near-lossless token set; in contrast, BHM preserves quality, showing that adapting the backbone to the compression path is essential for document parsing.
+
+Table~\ref{tab:omnidocbench_compression} reports category-level compression. Values in parentheses are gains over the reference compression bound (the official fixed $4\times$ down-sampling budget of PaddleOCR-VL-1.6). The learned density is content-adaptive rather than layout-fixed: sparse or background-heavy categories obtain larger gains, while text-heavy layouts retain more tokens. The negative value on Magazine is consistent with this: magazine pages are visually dense with mixed text/graphics, so fewer tokens are safely removable than the fixed bound assumes. Qualitatively, text, formulas, tables, and layout boundaries are preferentially retained while blank regions are aggressively merged.
 
 \begin{table*}[t]
 \centering
-\fontsize{7.8}{9.0}\selectfont
-\setlength{\tabcolsep}{3.0pt}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}C{0.18\textwidth}C{0.13\textwidth}L{0.29\textwidth}C{0.07\textwidth}C{0.13\textwidth}C{0.055\textwidth}C{0.055\textwidth}@{}}
+\fontsize{6.8}{7.5}\selectfont
+\setlength{\tabcolsep}{0.9pt}
+\renewcommand{\arraystretch}{1.08}
+
+\begin{tabular}{@{}%
+>{\centering\arraybackslash}m{0.11\textwidth}
+>{\centering\arraybackslash}m{0.10\textwidth}
+>{\raggedright\arraybackslash}m{0.20\textwidth}
+>{\centering\arraybackslash}m{0.045\textwidth}
+>{\centering\arraybackslash}m{0.070\textwidth}
+>{\centering\arraybackslash}m{0.045\textwidth}
+>{\centering\arraybackslash}m{0.045\textwidth}
+>{\centering\arraybackslash}m{0.050\textwidth}
+>{\centering\arraybackslash}m{0.065\textwidth}
+>{\centering\arraybackslash}m{0.060\textwidth}
+>{\centering\arraybackslash}m{0.060\textwidth}
+>{\centering\arraybackslash}m{0.065\textwidth}
+>{\centering\arraybackslash}m{0.050\textwidth}
+@{}}
 \toprule
 \multicolumn{2}{c}{\textbf{Model}} &
 \multicolumn{1}{c}{\textbf{Compression}} &
 \multicolumn{2}{c}{\textbf{Vision Tokens}} &
-\multicolumn{2}{c}{\textbf{VLM TFLOPS}} \\
+\multicolumn{2}{c}{\textbf{VLM TFLOPS}} &
+\multicolumn{6}{c}{\textbf{Parsing Metrics}} \\
 \cmidrule(lr){1-2}
 \cmidrule(lr){3-3}
 \cmidrule(lr){4-5}
 \cmidrule(lr){6-7}
+\cmidrule(lr){8-13}
 \textbf{Backbone} &
 \textbf{Arch} &
 \textbf{Method\&Stage} &
 \textbf{Input} &
 \textbf{Merged} &
 \textbf{ViT} &
-\textbf{Prefill} \\
-\midrule
-
-\multirow[c]{6}{0.18\textwidth}{\centering\shortstack[c]{\textbf{PaddleOCR-VL-1.6}\\\textbf{(0.9B)}}}
-& Pipeline$^\dagger$
-& Img$\rightarrow$Enc. (Crop) + Enc.$\rightarrow$LLM (4$\times$ Down)
-& 4954 & 1202 (-75.7\%) & 6.87 & 0.84 \\
-& E2E VLM$^\dagger_{\text{w/o Crop}}$
-& Enc.$\rightarrow$LLM (4$\times$ Down)
-& 4954 & 1239 (-75.0\%) & 7.13 & 0.87 \\
-& E2E VLM
-& --
-& 4954 & 4954 (0.0\%) & 7.13 & 6.17 \\
-& E2E VLM
-& Enc.$|_{\text{L}3}$ (BHM)
-& 4954 & 1511 (-69.5\%) & 2.45 & 1.46 \\
-& E2E VLM
-& Enc.$|_{\text{L}6}$ (BHM)
-& 4954 & 1421 (-71.3\%) & 2.95 & 1.10 \\
-& E2E VLM
-& Enc.$|_{\text{L}9}$ (BHM)
-& 4954 & 1434 (-71.1\%) & 3.54 & 1.05 \\
-\midrule
-
-\multirow[c]{5}{0.18\textwidth}{\centering\shortstack[c]{\textbf{MinerU2-VLM}\\\textbf{(0.9B)}}}
-& Pipeline$^\dagger$
-& Img$\rightarrow$Enc. (Crop) + Enc.$\rightarrow$LLM (Resize)
-& 10604 & 10604 (0.0\%) & 12.57 & 8.25 \\
-& E2E VLM
-& Enc.$|_{\text{L}20}$ (BHM)
-& 10604 & ? & -- & -- \\
-& E2E VLM$^\dagger_{\text{w/o Crop}}$
-& Img$\rightarrow$Enc. (Resize)
-& 729 & 729 (0.0\%) & 0.67 & 0.57 \\
-& E2E VLM
-& Img$\rightarrow$Enc. (Resize)
-& 729 & ? & -- & -- \\
-& E2E VLM
-& Enc.$|_{\text{L}3}$ (BHM)
-& 729 & ? & -- & -- \\
-\midrule
-
-\multirow[c]{2}{0.18\textwidth}{\centering\shortstack[c]{\textbf{dots.ocr}\\\textbf{(1.7B)}}}
-& E2E VLM$^\dagger$
-& Enc.$\rightarrow$LLM (4$\times$ Down)
-& 21510 & 5377 (-75.0\%) & 211.36 & 21.67 \\
-& E2E VLM
-& Enc.$|_{\text{L}32}$ (BHM)
-& 21510 & -- & -- & -- \\
-\bottomrule
-\end{tabular*}
-\caption{Efficiency comparison on OmniDocBench v1.6. Method with $^\dagger$ denotes the official implementation.}
-\label{tab:full_unified_efficiency}
-\end{table*}
-
-\begin{table*}[t]
-\centering
-\fontsize{7.1}{8.3}\selectfont
-\setlength{\tabcolsep}{1.2pt}
-\renewcommand{\arraystretch}{1.12}
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}
->{\centering\arraybackslash}m{0.11\textwidth}
->{\centering\arraybackslash}m{0.11\textwidth}
->{\centering\arraybackslash}m{0.26\textwidth}
->{\centering\arraybackslash}m{0.05\textwidth}
->{\centering\arraybackslash}m{0.08\textwidth}
->{\centering\arraybackslash}m{0.075\textwidth}
->{\centering\arraybackslash}m{0.075\textwidth}
->{\centering\arraybackslash}m{0.08\textwidth}
->{\centering\arraybackslash}m{0.07\textwidth}
-@{}}
-\toprule
-\multicolumn{2}{c}{\textbf{Model}} &
-\multicolumn{1}{c}{\textbf{Compression}} &
-\multicolumn{6}{c}{\textbf{Parsing Metrics}} \\
-\cmidrule(lr){1-2}
-\cmidrule(lr){3-3}
-\cmidrule(lr){4-9}
-\textbf{Backbone} &
-\textbf{Arch} &
-\textbf{Method\&Stage} &
-\textbf{Text}$^{\scriptsize\textbf{Edit}}\downarrow$ &
-\textbf{Formula}$^{\scriptsize\textbf{CDM}}\uparrow$ &
-\textbf{Table}$^{\scriptsize\textbf{TEDS}}\uparrow$ &
-\textbf{Table}$^{\scriptsize\textbf{TEDS-S}}\uparrow$ &
-\textbf{R-order}$^{\scriptsize\textbf{Edit}}\downarrow$ &
+\textbf{Prefill} &
+\shortstack{\textbf{Text}\\\textbf{Edit}$\downarrow$} &
+\shortstack{\textbf{Formula}\\\textbf{CDM}$\uparrow$} &
+\shortstack{\textbf{Table}\\\textbf{TEDS}$\uparrow$} &
+\shortstack{\textbf{Table}\\\textbf{TEDS-S}$\uparrow$} &
+\shortstack{\textbf{R-order}\\\textbf{Edit}$\downarrow$} &
 \textbf{Overall}$\uparrow$ \\
 \midrule
 
-\multirow[c]{6}{0.12\textwidth}{\centering\shortstack[c]{\textbf{PaddleOCR-VL}\\\textbf{(0.9B)}}}
+\multirow[c]{6}{*}{\parbox[c]{0.11\textwidth}{\centering\textbf{PaddleOCR-VL-1.6}\\\textbf{(0.9B)}}}
 & Pipeline$^\dagger$
 & Img$\rightarrow$Enc. (Crop) + Enc.$\rightarrow$LLM (4$\times$ Down)
+& 4954 & 1202 (-75.7\%) & 6.87 & 0.84
 & 0.033 & 97.49 & 94.76 & 97.11 & 0.127 & 96.33 \\
 & E2E VLM$^\dagger_{\text{w/o Crop}}$
 & Enc.$\rightarrow$LLM (4$\times$ Down)
+& 4954 & 1239 (-75.0\%) & 7.13 & 0.87
 & 0.072 & 92.22 & 85.01 & 88.24 & 0.168 & 90.06 \\
 & E2E VLM
 & --
+& 4954 & 4954 (0.0\%) & 7.13 & 6.17
 & 0.045 & 94.00 & 88.32 & 91.31 & 0.141 & 92.61 \\
 & E2E VLM
 & Enc.$|_{\text{L}3}$ (BHM)
+& 4954 & 1511 (-69.5\%) & 2.45 & 1.46
 & 0.056 & 95.08 & 87.20 & 90.41 & 0.146 & 92.23 \\
 & E2E VLM
 & Enc.$|_{\text{L}6}$ (BHM)
+& 4954 & 1421 (-71.3\%) & 2.95 & 1.10
 & 0.045 & 93.77 & 85.93 & 89.33 & 0.139 & 91.75 \\
 & E2E VLM
 & Enc.$|_{\text{L}9}$ (BHM)
+& 4954 & 1434 (-71.1\%) & 3.54 & 1.05
 & 0.049 & 95.50 & 87.62 & 91.04 & 0.138 & 92.76 \\
 \midrule
 
-\multirow[c]{5}{0.12\textwidth}{\centering\shortstack[c]{\textbf{MinerU2-VLM}\\\textbf{(0.9B)}}}
+\multirow[c]{5}{*}{\parbox[c]{0.11\textwidth}{\centering\textbf{MinerU2-VLM}\\\textbf{(0.9B)}}}
 & Pipeline$^\dagger$
 & Img$\rightarrow$Enc. (Crop) + Enc.$\rightarrow$LLM (Resize)
+& 10604 & 10604 (0.0\%) & 12.57 & 8.25
 & 0.102* & 82.42 & 81.38 & 84.88 & 0.198 & 84.54 \\
 & E2E VLM
 & Enc.$|_{\text{L}20}$ (BHM)
+& 10604 & ? & -- & --
 & -- & -- & -- & -- & -- & -- \\
 & E2E VLM$^\dagger_{\text{w/o Crop}}$
 & Img$\rightarrow$Enc. (Resize)
+& 729 & 729 (0.0\%) & 0.67 & 0.57
 & 0.130* & 77.40 & 75.53 & 79.05 & 0.224 & 79.96 \\
 & E2E VLM
 & Img$\rightarrow$Enc. (Resize)
+& 729 & ? & -- & --
 & -- & -- & -- & -- & -- & -- \\
 & E2E VLM
 & Enc.$|_{\text{L}3}$ (BHM)
+& 729 & ? & -- & --
 & -- & -- & -- & -- & -- & -- \\
 \midrule
 
-\multirow[c]{2}{0.12\textwidth}{\centering\shortstack[c]{\textbf{dots.ocr}\\\textbf{(1.7B)}}}
+\multirow[c]{2}{*}{\parbox[c]{0.11\textwidth}{\centering\textbf{dots.ocr}\\\textbf{(1.7B)}}}
 & E2E VLM$^\dagger$
 & Enc.$\rightarrow$LLM (4$\times$ Down)
+& 21510 & 5377 (-75.0\%) & 211.36 & 21.67
 & 0.054* & 90.88 & 86.51 & 89.98 & 0.139 & 90.68 \\
 & E2E VLM
 & Enc.$|_{\text{L}32}$ (BHM)
+& 21510 & -- & -- & --
 & -- & -- & -- & -- & -- & -- \\
 \bottomrule
-\end{tabular*}
-\caption{Parsing performance comparison on OmniDocBench v1.6. Method with $^\dagger$ denotes the official implementation.}
-\label{tab:full_unified_parsing}
+\end{tabular}
+
+\caption{Unified efficiency and parsing comparison on OmniDocBench v1.6. Method with $^\dagger$ denotes the official implementation.}
+\label{tab:full_unified_all}
 \end{table*}
 
-
 Table~\ref{tab:full_unified_efficiency} and Table~\ref{tab:full_unified_parsing} show that fixed reduction in official pipelines mainly reduces tokens after the visual encoder, whereas BHM reduces tokens inside the encoder. For PaddleOCR-VL-1.6, BHM reduces the visual sequence from 4954 tokens to about 1400 retained tokens, lowering both the later ViT cost and LLM prefill cost while maintaining competitive parsing quality.
-
-\subsection{Controlled Compression Comparison}
-\label{sec:controlled_comparison}
 
 \begin{table}[t]
 \centering
@@ -227,97 +167,7 @@ BlackHoleMerge-L9  & 0.049 & 95.50 & 87.62 & 91.04 & 0.138 & 92.76 \\
 
 Table~\ref{tab:omnidocbench_compare} isolates the compression rule under a controlled VLM-only setting. The style baselines are attached to the same no-merge SFT backbone and matched to a similar token budget, while \ours{} uses merge-aware SFT and RL from the same initialization. Under this protocol, BlackHole Merge preserves OCR quality much better than training-free pruning or merging styles, showing that adapting the backbone to the compression path is important for document parsing.
 
-\subsection{Compression Behavior Analysis}
-
 \begin{table}[t]
-\centering
-\fontsize{7.4}{8.6}\selectfont
-\setlength{\tabcolsep}{2.0pt}
-\renewcommand{\arraystretch}{1.12}
-\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}%
->{\centering\arraybackslash}m{0.13\columnwidth}
->{\centering\arraybackslash}m{0.38\columnwidth}
->{\centering\arraybackslash}m{0.13\columnwidth}
->{\centering\arraybackslash}m{0.13\columnwidth}
->{\centering\arraybackslash}m{0.13\columnwidth}
-@{}}
-\toprule
-\multicolumn{2}{c}{\textbf{Experiment}} &
-\multicolumn{3}{c}{\textbf{Token Density}} \\
-\cmidrule(lr){1-2}
-\cmidrule(lr){3-5}
-\shortstack[c]{\textbf{Merge}\\\textbf{Layer}} &
-\textbf{Strategy} &
-\textbf{Text*} &
-\textbf{Blank} &
-\textbf{Gap*} \\
-\midrule
--- & Pretrained & 0.597 & 0.441 & 0.156 \\
-\midrule
-\multirow[c]{2}{*}{\textbf{Layer 3}}
-& Merge-aware SFT & 0.642 & 0.388 & 0.254 \\
-& Merge SFT + Confidence-Penalty RL & \textbf{0.644} & \textbf{0.071} & \textbf{0.572} \\
-\cmidrule(lr){2-5}
-\multirow[c]{2}{*}{\textbf{Layer 6}}
-& Merge-aware SFT & \textbf{0.625} & 0.355 & 0.270 \\
-& Merge SFT + Confidence-Penalty RL & 0.562 & \textbf{0.051} & \textbf{0.512} \\
-\cmidrule(lr){2-5}
-\multirow[c]{2}{*}{\textbf{Layer 9}}
-& Merge-aware SFT & \textbf{0.617} & 0.423 & 0.194 \\
-& Merge SFT + Confidence-Penalty RL & 0.565 & \textbf{0.082} & \textbf{0.483} \\
-\bottomrule
-\end{tabular*}
-\caption{Token density evolution across different merge layers and training stages. Text/Blank metrics are computed on text and blank/background regions derived from OmniDocBench bounding boxes.}
-\label{tab:token_density}
-\end{table}
-
-\begin{table}[t]
-\centering
-\fontsize{7.4}{8.6}\selectfont
-\setlength{\tabcolsep}{2.0pt}
-\renewcommand{\arraystretch}{1.12}
-\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}%
->{\centering\arraybackslash}m{0.13\columnwidth}
->{\centering\arraybackslash}m{0.36\columnwidth}
->{\centering\arraybackslash}m{0.11\columnwidth}
->{\centering\arraybackslash}m{0.10\columnwidth}
->{\centering\arraybackslash}m{0.10\columnwidth}
->{\centering\arraybackslash}m{0.10\columnwidth}
-@{}}
-\toprule
-\multicolumn{2}{c}{\textbf{Experiment}} &
-\multicolumn{4}{c}{\textbf{Keep Ratio}} \\
-\cmidrule(lr){1-2}
-\cmidrule(lr){3-6}
-\shortstack[c]{\textbf{Merge}\\\textbf{Layer}} &
-\textbf{Strategy} &
-\shortstack[c]{\textbf{Gray}\\\textbf{Zone}} &
-\textbf{Text*} &
-\textbf{Blank} &
-\textbf{Overall} \\
-\midrule
--- & Pretrained & 68.7\% & 77.1\% & 41.7\% & 57.0\% \\
-\midrule
-\multirow[c]{2}{*}{\textbf{Layer 3}}
-& Merge-aware SFT & 51.7\% & 78.7\% & 23.8\% & 47.4\% \\
-& Merge SFT + Confidence-Penalty RL & \textbf{2.4\%} & 64.7\% & \textbf{6.9\%} & \textbf{31.8\%} \\
-\cmidrule(lr){2-6}
-\multirow[c]{2}{*}{\textbf{Layer 6}}
-& Merge-aware SFT & 48.0\% & 79.0\% & 21.5\% & 45.8\% \\
-& Merge SFT + Confidence-Penalty RL & \textbf{3.5\%} & 56.3\% & \textbf{4.1\%} & \textbf{26.6\%} \\
-\cmidrule(lr){2-6}
-\multirow[c]{2}{*}{\textbf{Layer 9}}
-& Merge-aware SFT & 61.9\% & 80.6\% & 37.0\% & 55.8\% \\
-& Merge SFT + Confidence-Penalty RL & \textbf{4.2\%} & 56.5\% & \textbf{6.6\%} & \textbf{28.1\%} \\
-\bottomrule
-\end{tabular*}
-\caption{Keep ratio statistics across different merge layers and training stages. Gray Zone indicates the ambiguous region between text and blank/background tokens.}
-\label{tab:keep_ratio}
-\end{table}
-
-Table~\ref{tab:merged_density_and_penalty} analyzes how merge-aware SFT and RL shape token densities. Merge-aware SFT increases the density gap between text and background tokens, indicating that the model adapts its Key-norm ranking to the compressed visual path. Confidence-Penalty RL further polarizes the distribution, suppresses blank-token density, and reduces the gray zone, turning the continuous SFT ranking into a clearer keep/drop decision.
-
-\begin{table}[!h]
   \fontsize{8.5}{10.0}\selectfont
   \setlength{\tabcolsep}{6pt}
   \renewcommand{\arraystretch}{1.2}
@@ -349,4 +199,3 @@ Skew & 76.14\% (\textit{+31.71\%}) \\
    \label{tab:omnidocbench_compression}
 \end{table}
 
-Table~\ref{tab:omnidocbench_compression} further reports category-level compression behavior. The learned density is content-adaptive rather than tied to a fixed page layout: sparse or background-heavy categories generally obtain larger compression gains, while text-heavy layouts retain more tokens. Qualitative visualizations show the same trend, with text, formulas, tables, and layout boundaries preferentially retained and blank regions aggressively merged.

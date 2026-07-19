@@ -14,6 +14,7 @@
 \usepackage{booktabs}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{array}
 \usepackage{subcaption}
 \usepackage{xcolor}
 \usepackage{colortbl}
@@ -41,6 +42,9 @@
 \definecolor{ocrrow}{RGB}{252,228,236}
 \definecolor{oursrow}{RGB}{237,231,246}
 
+\newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}m{#1}}
+
 \title{BlackHoleMerge: Content-Adaptive Token Merging for Document Parsing}
 \author{
     Anonymous Submission
@@ -55,7 +59,7 @@
   \old@maketitle%
   \vspace{-35pt} % 大幅缩小标题与图片之间的间距
   \begin{center}
-    \includegraphics[width=1\textwidth,keepaspectratio]{figures/final/begin_pic.pdf}
+    \includegraphics[width=0.81\textwidth,keepaspectratio]{figures/final/begin_pic.pdf}
     % \vspace{-5pt} % 缩小图片与题注之间的间距
     \captionof{figure}{1}
     \label{fig:cartoon}

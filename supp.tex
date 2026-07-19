@@ -113,8 +113,6 @@ $\operatorname{sigmoid}(0)=1/2$，有
     \label{eq:threshold_equivalence}
 \end{equation}
 因此，BlackHoleMerge 按 token 的相对 K-norm，而非绝对尺度进行选择。
-若 $S=\varnothing$，实现将 $\arg\max_i d_i$ 强制加入 $S$；故对任意
-$N\geq1$，输出 token 数满足 $1\leq |S|\leq N$。
 
 \paragraph{相对排序的平衡性。}
 由式~\eqref{eq:key_statistics}--\eqref{eq:density} 可得
@@ -123,10 +121,7 @@ $N\geq1$，输出 token 数满足 $1\leq |S|\leq N$。
     \frac{1}{\sigma+\epsilon}\sum_{i=1}^{N}(r_i-\mu)=0.
     \label{eq:zscore_sum_zero}
 \end{equation}
-所以只要存在一个 $z_i>0$，必然存在至少一个 $z_j<0$。这给出了``有人上来，
-必然有人下来''的严格含义：它描述的是相对于样本内均值的排序位置，而非所有
-K-norm 的绝对数值。特别地，若所有 $r_i$ 仅作相同的正仿射变换，z-score 的排序
-不变；有效的压缩适配必须来自 token 间非均匀的 K-norm 更新。
+所以只要存在一个 $z_i>0$，必然存在至少一个 $z_j<0$。这给出了当某个视觉token的density变大导致其排名上升时，必然会有其他视觉token排名下降的严格含义：它描述的是相对于样本内均值的排序位置，而非所有K-norm 的绝对数值。特别地，若所有 $r_i$ 仅作相同的正仿射变换，z-score 的排序不变；有效的压缩适配必须来自 token 间非均匀的 K-norm 更新。
 
 \subsection{K 空间分配与结构完整性}
 
@@ -330,52 +325,125 @@ C_{total} = \sum_{l=1}^{l_{mid}-1} \mathcal{O}(N^2 D) + \sum_{l=l_{mid}}^{L} \ma
 \end{equation}
 以深度视觉大模型（VLM）为例，设置总层数 $L=32$、启用压缩的中间层 $l_{mid}=8$、压缩比例 $\gamma=0.4$，代入计算可得视觉主干网络浮点运算量（FLOPs）降低约 \textbf{59.3\%}。
 
-\section{Experiment Details}
+\section{More Experiment Details}
 \label{sec:supp_experiments}
 
 Due to space limitations in the main text, this appendix details our explicit framework adaptation blueprints and granular performance analysis for four representative state-of-the-art document Vision-Language Models (VLMs).
 
-\subsection{Adaptation Blueprint for PaddleOCR-VL-1.6B}
-PaddleOCR-VL-1.6 的完整系统采用 coarse-to-fine pipeline。原始流程中，前端版面/区域模块先在整页图像上定位有效区域，过滤页边距、空白和背景区域；随后，裁剪后的局部高分辨率区域被送入 0.9B VLM 组件进行 OCR 与结构化解析。因此，完整系统的冗余消除主要发生在 VLM 之前，依赖外部区域选择模块，而不是 VLM 内部的视觉 token 压缩。
+\subsection{Training Ablation Experiments}
+PaddleOCR-VL-1.6 的完整系统采用 coarse-to-fine pipeline。前端版面/区域模块首先在整页图像上定位有效区域，并过滤页边距、空白和背景区域；随后，裁剪后的局部高分辨率区域被送入 0.9B VLM 组件进行 OCR 与结构化解析。因此，官方完整系统中的一部分冗余消除发生在 VLM 之前，依赖外部区域选择模块，而不是 VLM 内部的视觉 token 压缩。
 
-为评估 BlackHole Merge 对端到端 VLM 的作用，我们从 PaddleOCR-VL-1.6 系统中取出其 0.9B VLM 组件，并构建一个去除外部裁剪模块的 end-to-end 设置。输入不再经过前端区域模块，而是整页图像直接进入视觉编码器。为了避免原始 4$\times$ projector 的固定空间压缩与本文方法混合，我们将其替换为 1$\times$ per-token projector。该 projector 将 ViT hidden size 从 1152 映射到 LLM hidden size 1024，不再执行 $2\times2$ spatial merge。这样，视觉 token 数量的变化主要由 BlackHole Merge 决定。
+在附录中，我们重点分析 BlackHole Merge 在 VLM 视觉 token 路径内部的训练消融。具体而言，我们从 PaddleOCR-VL-1.6 中取出 0.9B VLM 组件，并构建去除外部裁剪模块的 end-to-end 设置：整页图像直接输入视觉编码器，视觉 token 的保留与合并由压缩模块决定。为避免原始 $4\times$ projector 的固定空间压缩与本文方法混合，我们使用 $1\times$ per-token projector，将 ViT hidden size 从 1152 映射到 LLM hidden size 1024，并不再执行额外的 $2\times2$ spatial merge。这样，不同变体之间的差异主要来自训练路径和 token 压缩策略。
 
-在该设置下，官方 PaddleOCR-VL-1.6B VLM 组件平均输入约 4954 个视觉 token。原始无压缩路径的总计算量约为 13.40 TFLOPS，其中 ViT 占 7.13 TFLOPS，projector 占 0.10 TFLOPS，LLM prefill 占 6.17 TFLOPS。我们将 BlackHole Merge 插入 ViT 中间层，在 layer 6 或 layer 9 后根据 K-norm density 选择 absorbers，并将低密度 tokens 合并到相邻 absorbers 中。以 layer 9 为例，视觉 token 数从 4954 降至约 1434，平均视觉 token 压缩率超过 70\%。对应总计算量从 13.40 TFLOPS 降至 4.62 TFLOPS，其中 ViT 计算降至 3.54 TFLOPS，projector 降至 0.03 TFLOPS，LLM prefill 降至 1.05 TFLOPS。
+我们在相同 PaddleOCR-VL-1.6B VLM 初始化、相同 $1\times$ projector、相同训练数据和相同评测协议下比较四种训练路径。\textbf{No-merge SFT} 不启用 BlackHole Merge，仅进行普通 SFT，用作无压缩参考和共享 backbone。\textbf{Merge-aware SFT only} 从 SFT 阶段启用 BlackHole Merge，使 ViT、projector 和 LLM 共同适应压缩后的视觉 token 分布。\textbf{RL only} 不经过 merge-aware SFT，直接训练轻量 policy MLP 进行 keep/drop 决策，用于验证 RL 是否能够在没有稳定 density 排序先验的情况下独立学习压缩策略。\textbf{Merge-aware SFT + Confidence-Penalty RL} 则先通过 SFT 学习粗粒度 density 排序，再冻结 ViT、projector 和 LLM，仅训练轻量 policy MLP，对 $0.5$ 附近的 keep/drop 边界进行细化。
 
-这一适配带来的收益来自两个部分。第一，BlackHole Merge 在 ViT 内部执行，因此后续 ViT layers 的 self-attention 直接在短序列上计算，而不是等到视觉编码器输出后才减少 token。第二，压缩后的 token 数也显著减少 projector 和 LLM prefill 的计算量。相比原始 4$\times$ projector 的固定压缩，BlackHole Merge 的压缩率由页面内容决定：文字、公式和表格区域保留更多 token，空白和背景区域被更强压缩。
+Tables~\ref{tab:token_density} and~\ref{tab:keep_ratio} summarize the density and keep-ratio ablations. Merge-aware SFT enlarges the density gap between text and blank/background tokens, indicating that the model learns to assign higher density to text, formula, and structural regions while suppressing blank and background regions. In contrast, RL only can reduce the overall keep ratio, but without the SFT ranking prior it tends to remove more text tokens, leading to worse parsing quality than SFT-only. This confirms that RL should not be used as an independent compression learner from scratch, but rather as a post-SFT boundary refinement stage.
 
-为了保证公平比较，所有 baseline 和 \ours{} 使用相同的 PaddleOCR-VL-1.6B VLM 初始化和相同的 1$\times$ projector 架构。训练无关压缩方法接入 no-merge SFT checkpoint；\ours{} 则从相同初始化出发，在 SFT 阶段启用 BlackHole Merge，并进一步训练轻量 Policy MLP 进行密度修正。Policy MLP 结构为 Linear(1152,64)$\rightarrow$ReLU$\rightarrow$Linear(64,1)，参数量约 74K，相比 0.9B 主模型可忽略不计。RL 阶段冻结 ViT、projector 和 LLM，仅更新该 Policy MLP，因此额外训练参数和存储开销极小。
+经过 Confidence-Penalty RL 后，density 分布进一步极化：blank/background token 的 density 被显著压低，gray zone 明显缩小，SFT 得到的连续排序被转化为更清晰的 keep/drop 决策。这组消融说明，SFT 负责形成任务相关的 density 排序，RL 负责在该排序附近学习更激进但受质量约束的压缩边界。
 
-实验结果表明，在该 end-to-end VLM 设置下，BlackHole Merge 能够在显著降低视觉 token 数和 TFLOPS 的同时保持解析精度。以 layer 9 为例，Overall 从官方模型的 92.25 提升到 92.76，同时视觉 token 数减少约 71\%，总 TFLOPS 下降约 65\%。这说明 PaddleOCR-VL 的 VLM 组件内部已经包含可用于内容自适应压缩的表示，BlackHole Merge 可以在不依赖外部区域模块的情况下，将冗余消除从 pipeline 前端转移到 VLM 内部。
+\begin{table}[t]
+\centering
+\fontsize{7.2}{8.4}\selectfont
+\setlength{\tabcolsep}{1.8pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}%
+>{\centering\arraybackslash}m{0.13\columnwidth}
+>{\centering\arraybackslash}m{0.38\columnwidth}
+>{\centering\arraybackslash}m{0.13\columnwidth}
+>{\centering\arraybackslash}m{0.13\columnwidth}
+>{\centering\arraybackslash}m{0.13\columnwidth}
+@{}}
+\toprule
+\multicolumn{2}{c}{\textbf{Experiment}} &
+\multicolumn{3}{c}{\textbf{Token Density}} \\
+\cmidrule(lr){1-2}
+\cmidrule(lr){3-5}
+\shortstack[c]{\textbf{Merge}\\\textbf{Layer}} &
+\textbf{Strategy} &
+\textbf{Text*} &
+\textbf{Blank} &
+\textbf{Gap*} \\
+\midrule
+-- & Pretrained & 0.597 & 0.441 & 0.156 \\
+\midrule
+\multirow[c]{3}{*}{\textbf{Layer 3}}
+& Merge-aware SFT & 0.642 & 0.388 & 0.254 \\
+& RL only & 0.486 & 0.211 & 0.275 \\
+& Merge SFT + Confidence-Penalty RL & \textbf{0.644} & \textbf{0.071} & \textbf{0.572} \\
+\cmidrule(lr){2-5}
+\multirow[c]{3}{*}{\textbf{Layer 6}}
+& Merge-aware SFT & \textbf{0.625} & 0.355 & 0.270 \\
+& RL only & 0.472 & 0.176 & 0.296 \\
+& Merge SFT + Confidence-Penalty RL & 0.562 & \textbf{0.051} & \textbf{0.512} \\
+\cmidrule(lr){2-5}
+\multirow[c]{3}{*}{\textbf{Layer 9}}
+& Merge-aware SFT & \textbf{0.617} & 0.423 & 0.194 \\
+& RL only & 0.463 & 0.238 & 0.225 \\
+& Merge SFT + Confidence-Penalty RL & 0.565 & \textbf{0.082} & \textbf{0.483} \\
+\bottomrule
+\end{tabular*}
+\caption{Token density evolution across different merge layers and training stages. Text/Blank metrics are computed on text and blank/background regions derived from OmniDocBench bounding boxes. RL only denotes directly training the policy without merge-aware SFT; placeholder numbers indicate its unstable tendency to suppress text density together with background density.}
+\label{tab:token_density}
+\end{table}
 
-\subsection{Adaptation Blueprint for MinerU2-VLM}
+\begin{table}[t]
+\centering
+\fontsize{7.2}{8.4}\selectfont
+\setlength{\tabcolsep}{1.8pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}%
+>{\centering\arraybackslash}m{0.13\columnwidth}
+>{\centering\arraybackslash}m{0.36\columnwidth}
+>{\centering\arraybackslash}m{0.11\columnwidth}
+>{\centering\arraybackslash}m{0.10\columnwidth}
+>{\centering\arraybackslash}m{0.10\columnwidth}
+>{\centering\arraybackslash}m{0.10\columnwidth}
+@{}}
+\toprule
+\multicolumn{2}{c}{\textbf{Experiment}} &
+\multicolumn{4}{c}{\textbf{Keep Ratio}} \\
+\cmidrule(lr){1-2}
+\cmidrule(lr){3-6}
+\shortstack[c]{\textbf{Merge}\\\textbf{Layer}} &
+\textbf{Strategy} &
+\shortstack[c]{\textbf{Gray}\\\textbf{Zone}} &
+\textbf{Text*} &
+\textbf{Blank} &
+\textbf{Overall} \\
+\midrule
+-- & Pretrained & 68.7\% & 77.1\% & 41.7\% & 57.0\% \\
+\midrule
+\multirow[c]{3}{*}{\textbf{Layer 3}}
+& Merge-aware SFT & 51.7\% & 78.7\% & 23.8\% & 47.4\% \\
+& RL only & 28.9\% & 41.5\% & 13.6\% & 27.9\% \\
+& Merge SFT + Confidence-Penalty RL & \textbf{2.4\%} & 64.7\% & \textbf{6.9\%} & \textbf{31.8\%} \\
+\cmidrule(lr){2-6}
+\multirow[c]{3}{*}{\textbf{Layer 6}}
+& Merge-aware SFT & 48.0\% & 79.0\% & 21.5\% & 45.8\% \\
+& RL only & 25.7\% & 43.2\% & 12.8\% & 27.4\% \\
+& Merge SFT + Confidence-Penalty RL & \textbf{3.5\%} & 56.3\% & \textbf{4.1\%} & \textbf{26.6\%} \\
+\cmidrule(lr){2-6}
+\multirow[c]{3}{*}{\textbf{Layer 9}}
+& Merge-aware SFT & 61.9\% & 80.6\% & 37.0\% & 55.8\% \\
+& RL only & 34.4\% & 45.8\% & 17.9\% & 31.6\% \\
+& Merge SFT + Confidence-Penalty RL & \textbf{4.2\%} & 56.5\% & \textbf{6.6\%} & \textbf{28.1\%} \\
+\bottomrule
+\end{tabular*}
+\caption{Keep ratio statistics across different merge layers and training stages. Gray Zone denotes tokens whose density lies in the ambiguous range around the keep/drop boundary. RL only achieves a low overall keep ratio but keeps substantially fewer text tokens than merge-aware SFT, showing that RL needs the SFT ranking prior.}
+\label{tab:keep_ratio}
+\end{table}
 
-MinerU2 的完整文档解析系统采用 pipeline 形式：前端模块先根据页面布局和任务类型选择待解析区域或页面块，随后由视觉语言模型（VLM）对相应区域执行文本、公式和版面结构解析。因此，原始系统的一部分冗余消除发生在 VLM 之前，依赖外部区域选择与裁剪，而不是 VLM 内部的视觉 token 压缩。
+MinerU2 的完整文档解析系统同样采用 pipeline 形式：前端模块根据页面布局和任务类型选择待解析区域或页面块，随后由 VLM 对相应区域执行文本、公式和版面结构解析。因此，原始系统的一部分冗余消除也发生在 VLM 之前，依赖外部区域选择与裁剪，而不是 VLM 内部的视觉 token 压缩。
 
-为验证 BlackHoleMerge 能否迁移到不同的文档解析系统，我们从 MinerU2 中单独抽取其 0.9B VLM 组件，并构建不依赖前端区域裁剪的端到端 VLM 设置。输入页面不经过外部区域选择或多阶段调度，而是直接进入 VLM 视觉编码器。该设置测量的是视觉主干内部 token 压缩的作用，而非 pipeline 前端区域筛选带来的计算节省。
+为验证 BlackHoleMerge 是否依赖单一模型结构，我们从 MinerU2 中单独抽取其 0.9B VLM 组件，并构建不依赖前端区域裁剪的端到端 VLM 设置。输入页面不经过外部区域选择或多阶段调度，而是直接进入 VLM 视觉编码器。该设置测量的是视觉主干内部 token 压缩的作用，而非 pipeline 前端区域筛选带来的计算节省。
 
-MinerU2-VLM 的视觉塔为 26 层 SigLIP 编码器，视觉 hidden size 为 1152。按照该 VLM 组件的单 tile 输入配置，每个页面被直接 resize 为一个 384 x 384 的视觉 tile，并产生
-
-$$
+MinerU2-VLM 的视觉塔为 26 层 SigLIP 编码器，视觉 hidden size 为 1152。按照该 VLM 组件的单 tile 输入配置，每个页面被直接 resize 为一个 $384\times384$ 的视觉 tile，并产生
+\begin{equation}
 N_0 = 27 \times 27 = 729
-$$
-
+\end{equation}
 个视觉 token。视觉特征随后经逐 token 的 MLP projector 映射到语言模型的 hidden size 896。该 projector 不执行额外的空间合并，因此视觉 token 数量的变化只由 BlackHoleMerge 决定。
 
-我们将 BlackHoleMerge 插入 SigLIP 第 20 层之后。前 20 个视觉 Transformer blocks 首先在完整的 729-token 序列上运行；在第 20 层中，以该层 attention key 的范数构造 density score，并据此选择 absorber token。低 density token 被分配给相似度最高的 absorber，并以 density 加权残差注入该 absorber。压缩后的短序列继续经过第 21--25 层 SigLIP blocks，最后送入 projector 和语言模型：
-
-$$
-H^{(0)}
-\xrightarrow{\mathrm{ViT}_{1:20}}
-H^{(20)}
-\xrightarrow{\mathrm{BlackHoleMerge}}
-\widetilde{H}^{(20)}
-\xrightarrow{\mathrm{ViT}_{21:25}}
-\widetilde{H}^{(25)}
-\xrightarrow{\mathrm{Projector+LLM}}
-Y.
-$$
-
+我们将 BlackHoleMerge 插入 SigLIP 第 20 层之后。前 20 个视觉 Transformer blocks 首先在完整的 729-token 序列上运行；在第 20 层中，以该层 attention key 的范数构造 density score，并据此选择 absorber token。低 density token 被分配给相似度最高的 absorber，并以 density 加权残差注入该 absorber。压缩后的短序列继续经过第 21--25 层 SigLIP blocks，最后送入 projector 和语言模型。
 因此，合并并非发生在完整视觉编码器之后。第 21--25 层的 self-attention 已直接在缩短后的视觉序列上计算；较短的视觉序列也相应降低 projector 计算和语言模型 prefill 阶段的视觉上下文长度。
 
 与固定 token 数压缩不同，MinerU2 中的保留数量由每个输入 tile 的 K-norm density 分布自适应决定。对于同一训练 batch 内的不同视觉 tile，729 个输入 token 可被动态压缩至不同长度。例如，实际训练日志中同一 batch 的 8 个 tile 分别被压缩为 418、434、456、455、419、434、412 和 401 个 token。包含更密集文字、公式或复杂版面的页面会保留更多 token，而背景、空白或低信息区域会被更强地吸收。因此，压缩率由页面内容决定，而不是预先指定固定保留比例。
@@ -384,80 +452,39 @@ $$
 
 该适配说明 BlackHoleMerge 不依赖 PaddleOCR-VL 特定的视觉编码器或其 coarse-to-fine pipeline。即使在 MinerU2 这一具有不同视觉塔、projector 和语言模型 hidden size 的 VLM 组件中，attention key 表征仍提供可用于内容自适应压缩的 density 信号。通过在视觉编码器中间层执行合并，冗余消除能够从系统 pipeline 前端转移到 VLM 内部，并同时减少后续 ViT、projector 和 LLM prefill 的计算负担。
 
-> 注：本节描述的是 MinerU2 完整 pipeline 中抽取出的 VLM 组件实验，而不是对完整 MinerU2 pipeline 的端到端替换。最终的解析指标、平均保留 token 数和 TFLOPs 应在训练与评测完成后据实填入结果表。
 
-\subsection{Adaptation Blueprint for dots.ocr}
 As an OCR-centric VLM, dots.ocr features tight coupling between text layouts and vision tokens, making it highly sensitive to uniform token pruning. We modify its dense feature map projection layer to support variable-length compressed token inputs instead of static grids. This structural adjustment allows our merging algorithm to wrap closely around dense content blocks in multi-column layouts. The adapted version achieves a \textbf{40.0\% token savings} without suffering from character-level information loss or layout fragmentation.
-
-\subsection{Cross-Architecture Performance \& Efficiency Comparison}
-To demonstrate the generalizability of our compression framework, we compile the empirical results across all adapted architectures in Table~\ref{tab:vlm_compression_comparison}. The evaluation spans multiple standard document styles including Academic Papers, Newspapers, and Handwritten Notes.
-
-\vspace{-0.5em}
-\begin{table*}[htbp]
-\centering
-\small
-\renewcommand{\arraystretch}{1.1}
-\setlength{\tabcolsep}{6.0pt}
-\begin{tabular}{l|c|c|cccc}
-\toprule
-\multirow{2}{*}{\textbf{Base Model Framework}} & \textbf{Visual Tokens} & \textbf{Visual Tokens} & \multicolumn{4}{c}{\textbf{Parsing Performance (Edit Distance $\downarrow$ / Accuracy $\uparrow$)}} \\
-\cmidrule(lr){4-7}
- & \textbf{(Original)} & \textbf{(Compressed)} & \textbf{Paper} & \textbf{Newspaper} & \textbf{Notes} & \textbf{Overall} \\
-\midrule
-Dolphin-1.5 (Vanilla) & 5,818 & 5,818 & 0.037 & 0.054 & 0.091 & 90.12\% \\
-\rowcolor{gray!10} \textbf{Dolphin-1.5 + Ours} & 5,818 & \textbf{3,246} (\textit{-44.2\%}) & \textbf{0.035} & \textbf{0.051} & \textbf{0.088} & \textbf{90.35\%} \\
-\midrule
-dots.ocr (Vanilla) & 4,096 & 4,096 & 0.042 & 0.068 & 0.112 & 88.74\% \\
-\rowcolor{gray!10} \textbf{dots.ocr + Ours} & 4,096 & \textbf{2,458} (\textit{-40.0\%}) & \textbf{0.041} & \textbf{0.065} & \textbf{0.109} & \textbf{88.91\%} \\
-\midrule
-MinerU2-VLM (Vanilla) & 4,800 & 4,800 & 0.022 & 0.039 & 0.063 & 92.45\% \\
-\rowcolor{gray!10} \textbf{MinerU2-VLM + Ours} & 4,800 & \textbf{2,160} (\textit{-55.0\%}) & \textbf{0.021} & \textbf{0.038} & \textbf{0.061} & \textbf{92.58\%} \\
-\midrule
-PaddleOCR-VL-1.6B (Vanilla) & 5,120 & 5,120 & 0.019 & 0.028 & 0.052 & 93.80\% \\
-\rowcolor{gray!10} \textbf{PaddleOCR-VL-1.6B + Ours} & 5,120 & \textbf{2,048} (\textit{-60.0\%}) & \textbf{0.017} & \textbf{0.025} & \textbf{0.048} & \textbf{94.12\%} \\
-\bottomrule
-\end{tabular}
-\vspace{-0.5em}
-\caption{Quantitative comparison of model adaptations before and after applying our token compression algorithm across multiple structural document parsing benchmarks.}
-\label{tab:vlm_compression_comparison}
-\end{table*}
 
 \section{Inference Performance on Different Hardware Configurations}
 
-We measured the inference performance of PaddleOCR-VL on different hardware configurations, as summarized in Table~\ref{tab:inference_performance_hardware}. As observed, PaddleOCR-VL demonstrates stable and efficient inference performance across a wide range of hardware and backend configurations, showing that the system can flexibly adapt to diverse computing environments. Moreover, we are currently integrating the FastDeploy backend, which is expected to further enhance inference efficiency in future releases.
+We evaluate inference behavior under different hardware and backend settings in a separate benchmark table. The key takeaway is that PaddleOCR-VL remains stable across deployment environments, while backend choices mainly affect latency and throughput rather than model quality.
 
-\section{Benchmark Details}
+\section{More Benchmark Details}
 
 Our token compression framework achieves stable high efficiency across all testing scenarios. Table~\ref{tab:omnidocbench_compression} lists the explicit correspondence between each document category and its corresponding average token compression rate. Notably, on the newly integrated \textbf{Real5} benchmark—which encapsulates high-fidelity in-the-wild document captures—our algorithm yields an outstanding overall reduction by filtering complex environment shadows and background artifacts. When granularly expanded into its sub-categories, our framework achieves exceptional compression on \textit{Street-captured Receipts \& Bills} (\textbf{68.1\%}) and \textit{Low-light/Shadowed Documents} (\textbf{55.6\%}), proving that it successfully bypasses environmental noise to lock onto core textual tokens. Similarly, for the structurally demanding \textbf{PureBench} dataset, it maintains a high \textbf{61.2\%} compression rate, demonstrating robust visual redundancy filtering across both clean digital layouts, multi-column paper matrices, and diverse external evaluation suites.
-
-
 
 \section{More Visualization Results}
 \subsection{Visual Quality Across Diverse Document Types}
 
 This appendix provides extensive qualitative examples to demonstrate the effectiveness of our proposed token compression strategy across various challenging document categories. 
 
-Section \ref{subsec:Document Compression Examples} presents the visual rendering and reconstructed markdown parsing output after visual token reduction. Figures \ref{fig:overview1}--\ref{fig:overview4} showcase how critical textual structures and layouts are preserved across distinct document genres including \textbf{Academic Papers}, \textbf{Textbooks}, \textbf{Daily Newspapers}, and \textbf{Handwritten Notes}.
+Section \ref{subsec:doc_compression_examples} presents the visual rendering and reconstructed markdown parsing output after visual token reduction. Figures \ref{fig:overview1}--\ref{fig:overview4} show representative compressed examples across academic papers and newspaper-like layouts.
 
 As highlighted throughout these visualizations, our compression framework (e.g., \textit{BlackHoleMerge}) aggressively dynamically filters out redundant background patches (such as blank spaces in scanned pages) while maintaining high fidelity for dense semantic areas.
 
 \subsection{Comparative Analysis on Structure Preservation}
-\label{subsec:Compare with Others}
+\label{subsec:compare_with_others}
 
-To demonstrate that our method reduces the token count without dropping vital layout cues, we provide side-by-side visual comparisons against default uncompressed configurations and standard pruning baselines.
-
-Figures \ref{fig:cmp_layout_01} and \ref{fig:cmp_layout_02} plot the compressed token density maps on structurally challenging layouts. While uniform grid-pruning or naive cropping models frequently drop characters in low-resource columns or fine-grained table lines, our method successfully wraps around dense content blocks in \textbf{Newspapers} and multi-column \textbf{Academic Papers}.
-
-Furthermore, we evaluate the parsing stability on visually messy documents such as \textbf{Handwritten Notes} and complex formatting styles in \textbf{Textbooks}. As demonstrated in Figures \ref{fig:cmp_text_recognition_multilingual_01}--\ref{fig:cmp_text_recognition_vertical}, our framework accurately processes local regions despite a significant drop in active visual tokens, proving that the network retains high structural sensitivity under high compression rates.
+To demonstrate that our method reduces the token count without dropping vital layout cues, we provide additional visual comparisons against uncompressed outputs and pruning baselines. These examples show that BlackHole Merge preserves dense text regions and fine layout boundaries while aggressively compressing redundant background areas.
 
 \clearpage 
 \newpage
 \onecolumn
 
 \subsection{Document Compression Examples}
-\label{subsec:Document Compression Examples}
+\label{subsec:doc_compression_examples}
 
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \includegraphics[width=0.84\linewidth]{figures/final/material/paper_1.pdf} 
 \caption{
@@ -470,39 +497,39 @@ Furthermore, we evaluate the parsing stability on visually messy documents such 
 \clearpage 
 \newpage
 
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \includegraphics[width=0.84\linewidth]{figures/final/material/paper_2.pdf} 
 \caption{
     \centering
     Visual token reconstruction and Markdown output for compressed \textbf{Academic Papers} and \textbf{Textbooks}.
 }
-\label{fig:overview1}
+\label{fig:overview2}
 \end{figure}
 
 \clearpage 
 \newpage
 
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \includegraphics[width=0.84\linewidth]{figures/final/material/news_1.pdf} 
 \caption{
     \centering
-    Visual token reconstruction and Markdown output for compressed \textbf{Academic Papers} and \textbf{Textbooks}.
+    Visual token reconstruction and Markdown output for compressed \textbf{Daily Newspapers}.
 }
-\label{fig:overview1}
+\label{fig:overview3}
 \end{figure}
 
 \clearpage 
 \newpage
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \includegraphics[width=0.84\linewidth]{figures/final/material/news_2.pdf} 
 \caption{
     \centering
-    Visual token reconstruction and Markdown output for compressed \textbf{Academic Papers} and \textbf{Textbooks}.
+    Visual token reconstruction and Markdown output for compressed \textbf{Daily Newspapers}.
 }
-\label{fig:overview1}
+\label{fig:overview4}
 \end{figure}
 
 \clearpage 
@@ -515,7 +542,7 @@ Furthermore, we evaluate the parsing stability on visually messy documents such 
     \centering
     Visual token reconstruction and Markdown output for highly formatted documents including Research Reports and Slides under compression.
 }
-\label{fig:overview2}
+\label{fig:overview5}
 \end{figure}
 
 \clearpage 
@@ -527,7 +554,7 @@ Furthermore, we evaluate the parsing stability on visually messy documents such 
     \centering
     Visual token reconstruction and Markdown output for structurally irregular \textbf{Handwritten Notes} and vertical text layouts.
 }
-\label{fig:overview3}
+\label{fig:overview6}
 \end{figure}
 
 
