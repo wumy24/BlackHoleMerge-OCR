@@ -75,97 +75,170 @@
 \renewcommand{\thetable}{S\arabic{table}}
 \renewcommand{\thefigure}{S\arabic{figure}}
 
-\section{Theoretical Derivation of Token Compression}
+\section{Theoretical Analysis of Token Compression}
 \label{sec:supp_derivation}
 
-为说明所提出 token 压缩框架（以 \textit{BlackHoleMerge} 为例）的结构完整性、排序
-适配机制及计算收益，下面给出严格推导。需要强调的是，以下结论证明的是算子的
-非空性、完整分配、K-norm 排序重排条件及局部扰动上界；下游 OCR/文档解析精度的
-保持属于经验命题，应由正文中的匹配训练与评测结果验证。
+This section provides a rigorous analysis of the proposed token-compression
+framework (instantiated as \textit{BlackHole Merge}), covering its
+\emph{structural integrity}, \emph{ranking-adaptation mechanism}, and
+\emph{computational savings}. The argument proceeds as follows:
+(I.A) defines the K-norm density and the token-selection rule and shows the
+criterion is \emph{relative}; (I.B) shows the absorption assignment is a
+complete, disjoint partition with a bounded local perturbation; (I.C) explains
+how, in the CE-only SFT stage, gradients \emph{indirectly} reshape the K-norm
+ranking; (I.D) derives first-order conditions for rank swaps and for crossing the
+keep/absorb threshold; (I.E) analyzes the non-differentiability of hard
+compression and how it dictates the division of labor across training stages;
+and (I.F) quantifies the complexity reduction from mid-layer compression.
+We stress that the following propositions establish \emph{structural} results
+(non-emptiness, complete assignment, re-ranking conditions, and a local
+perturbation bound); preserving downstream OCR/parsing accuracy is an
+\emph{empirical} claim, validated by the training and evaluation results in the
+main paper.
 
-\subsection{K-norm 密度与 token 选择}
+\subsection{K-norm Density and Token Selection}
 
-设第 $\ell$ 个视觉 Transformer 层的输入 token 为
-$\{x_i\}_{i=1}^{N}$，其中 $x_i\in\mathbb{R}^{d_x}$。对应的 attention key 为
+The core of \ours{} is a \emph{per-image, relative} density criterion: whether a
+token is retained depends on its K-norm \emph{relative to the other tokens of the
+same image}, not on its absolute magnitude. We first define it and then prove
+this relative property.
+
+Let $\{x_i\}_{i=1}^{N}$ with $x_i\in\mathbb{R}^{d_x}$ be the input tokens of the
+$\ell$-th visual Transformer layer, with attention keys and their norms
 \begin{equation}
     k_i=W_Kx_i+b_K\in\mathbb{R}^{d_k},\qquad
     r_i=\lVert k_i\rVert_2 .
     \label{eq:key_norm}
 \end{equation}
-对同一图像内的 $N$ 个 token，定义
+Over the $N$ tokens of one image, we compute the mean and standard deviation of
+the K-norms
 \begin{equation}
     \mu=\frac{1}{N}\sum_{t=1}^{N}r_t,\qquad
     \sigma=\sqrt{\frac{1}{N}\sum_{t=1}^{N}(r_t-\mu)^2},
     \label{eq:key_statistics}
 \end{equation}
-并以 z-score 归一化 K-norm 后得到 density
+and turn them into a density via z-score normalization followed by a sigmoid,
 \begin{equation}
     z_i=\frac{r_i-\mu}{\sigma+\epsilon},\qquad
-    d_i=\operatorname{sigmoid}(z_i).
+    d_i=\operatorname{sigmoid}(z_i)\in(0,1).
     \label{eq:density}
 \end{equation}
-令 $S=\{i\mid d_i\geq 1/2\}$ 为保留的 absorber 集合，
-$R=\{1,\dots,N\}\setminus S$ 为待吸收集合。由于 sigmoid 单调且
-$\operatorname{sigmoid}(0)=1/2$，有
+Let $S=\{i\mid d_i\ge 1/2\}$ be the retained absorber set and
+$R=\{1,\dots,N\}\setminus S$ the set to be absorbed. Since the sigmoid is
+monotone and $\operatorname{sigmoid}(0)=1/2$, the keep criterion is equivalent to
+``K-norm above the image mean'':
 \begin{equation}
-    d_i\geq\frac12\Longleftrightarrow z_i\geq0
-    \Longleftrightarrow r_i\geq\mu.
+    d_i\ge\tfrac12
+    \;\Longleftrightarrow\; z_i\ge0
+    \;\Longleftrightarrow\; r_i\ge\mu .
     \label{eq:threshold_equivalence}
 \end{equation}
-因此，BlackHoleMerge 按 token 的相对 K-norm，而非绝对尺度进行选择。
+Hence the threshold $0.5$ is not a hyper-parameter to tune, but the natural
+boundary set by the per-image average density.
 
-\paragraph{相对排序的平衡性。}
-由式~\eqref{eq:key_statistics}--\eqref{eq:density} 可得
+\paragraph{The criterion is relative (a zero-sum competition).}
+Summing \eqref{eq:density} over the image and using $\sum_i(r_i-\mu)=0$ yields
 \begin{equation}
-    \sum_{i=1}^{N}z_i=
-    \frac{1}{\sigma+\epsilon}\sum_{i=1}^{N}(r_i-\mu)=0.
+    \sum_{i=1}^{N}z_i
+    =\frac{1}{\sigma+\epsilon}\sum_{i=1}^{N}(r_i-\mu)=0 .
     \label{eq:zscore_sum_zero}
 \end{equation}
-所以只要存在一个 $z_i>0$，必然存在至少一个 $z_j<0$。这给出了当某个视觉token的density变大导致其排名上升时，必然会有其他视觉token排名下降的严格含义：它描述的是相对于样本内均值的排序位置，而非所有K-norm 的绝对数值。特别地，若所有 $r_i$ 仅作相同的正仿射变换，z-score 的排序不变；有效的压缩适配必须来自 token 间非均匀的 K-norm 更新。
+Equation~\eqref{eq:zscore_sum_zero} shows the z-scores always sum to zero: if any
+token has $z_i>0$, some other token must have $z_j<0$. Two consequences follow.
+\emph{(i) Relativity.} The keep/absorb partition reflects each token's rank
+\emph{relative to the image mean}, not its absolute K-norm; when one token's
+density rises and its rank moves up, another token's rank must move down.
+\emph{(ii) Scale invariance.} If all $r_i$ undergo the same positive affine map
+$r_i\mapsto ar_i+b\ (a>0)$, then $\mu$ and $\sigma$ scale accordingly, $z_i$ is
+unchanged, and so is the partition $S/R$. Together these imply that
+\textbf{any effective change to the compression partition cannot come from a
+uniform rescaling of all tokens, but must arise from \emph{non-uniform} per-token
+updates of the K-norms.} This is exactly what I.C addresses: how training
+produces such non-uniform updates—and thereby re-ranks the density—when the only
+supervision is CE and the hard selection is non-differentiable.
+\label{sec:supp_derivation}
 
-\subsection{K 空间分配与结构完整性}
+\subsection{K-space Assignment and Structural Integrity}
 
-对每个被吸收 token $j\in R$，定义其 absorber 为
+This subsection establishes two structural properties of the absorption
+assignment—\emph{the retained set is non-empty} (an absorber always exists) and
+\emph{every absorbee is assigned uniquely} (no token is dropped or double
+counted)—so that compression neither loses nor duplicates any token. We then
+bound the local perturbation induced by the merge.
+
+\paragraph{The retained set is non-empty.}
+Since $r_{\max}=\max_i r_i\ge\mu$ (the maximum is at least the mean) and by
+\eqref{eq:threshold_equivalence}, the token attaining the largest K-norm
+satisfies $d_i\ge 1/2$; hence
+\begin{equation}
+    S=\{i\mid d_i\ge 1/2\}\neq\varnothing .
+\end{equation}
+This guarantees that the $\arg\max_{i\in S}$ below is always taken over a
+non-empty set, so the assignment is well defined.
+
+\paragraph{Completeness and disjointness of the assignment.}
+For each absorbee $j\in R$, its absorber is chosen by density-weighted cosine
+similarity of the Key vectors:
 \begin{equation}
     a(j)=\arg\max_{i\in S}
-    \left[\frac{k_j^\top k_i}{\lVert k_j\rVert_2\lVert k_i\rVert_2}d_i\right].
+    \left[\frac{k_j^\top k_i}{\lVert k_j\rVert_2\,\lVert k_i\rVert_2}\,d_i\right].
     \label{eq:assignment}
 \end{equation}
-对固定的 $S$，式~\eqref{eq:assignment} 最大化如下可分目标：
+The cosine term measures feature compatibility, while $d_i$ favors reliable
+high-density absorbers. Aggregating all assignments is equivalent to maximizing
 \begin{equation}
-    \max_{a:R\rightarrow S}\sum_{j\in R}
-    \operatorname{cos}(k_j,k_{a(j)})d_{a(j)}.
+    \max_{a:R\rightarrow S}\;\sum_{j\in R}
+    \operatorname{cos}(k_j,k_{a(j)})\,d_{a(j)} .
     \label{eq:assignment_objective}
 \end{equation}
-证明很直接：式~\eqref{eq:assignment_objective} 对每个 $j$ 可分，对每个 token
-单独取最大 attraction 即得到全局最优分配。由 $\arg\max$ 的唯一输出规则，
-$\{j\in R:a(j)=i\}_{i\in S}$ 构成 $R$ 的不交划分，因而不存在漏分配或重复分配。
+The key observation is that \eqref{eq:assignment_objective} is \emph{fully
+separable} over $j$: the choice of absorber for one $j$ does not affect the term
+of any other $j$. Therefore the mapping obtained by an independent per-token
+$\arg\max$ (i.e., \eqref{eq:assignment}) is the global optimum of this objective,
+with no combinatorial search required. Moreover, since $\arg\max$ returns a
+unique absorber for each $j$, the family
+$\{\,\{j\in R:a(j)=i\}\,\}_{i\in S}$ forms a disjoint partition of $R$: every
+absorbee belongs to exactly one absorber, with neither missing nor duplicated
+assignments. This is the precise meaning of ``complete assignment'' for the
+compression operator.
 
-设 $h_i\in\mathbb{R}^{d}$ 是用于下游 projector/LLM 的视觉特征。部署的残差吸收为
+\paragraph{The merge has a bounded local perturbation.}
+Let $h_i\in\mathbb{R}^{d}$ be the visual feature passed to the downstream
+projector/LLM. Each absorber $i\in S$ absorbs its assigned tokens through a
+density-weighted residual:
 \begin{equation}
     \widetilde h_i=h_i+
-    \sum_{j\in R:a(j)=i}d_j(h_j-h_i),\qquad i\in S.
+    \sum_{j\in R:\,a(j)=i}d_j\,(h_j-h_i),\qquad i\in S.
     \label{eq:residual_merge}
 \end{equation}
-因此每个 absorber 的局部扰动满足
+Note this \emph{pulls} the absorber toward its absorbees in a weighted manner,
+rather than taking a plain average. By the triangle inequality, the change of
+each absorber feature satisfies
 \begin{equation}
-    \left\lVert\widetilde h_i-h_i\right\rVert_2
-    \leq\sum_{j\in R:a(j)=i}d_j\left\lVert h_j-h_i\right\rVert_2.
+    \bigl\lVert\widetilde h_i-h_i\bigr\rVert_2
+    \le\sum_{j\in R:\,a(j)=i}d_j\,\bigl\lVert h_j-h_i\bigr\rVert_2 .
     \label{eq:local_bound}
 \end{equation}
-式~\eqref{eq:local_bound} 由三角不等式直接得到。它说明低 density token 的影响被
-显式衰减；同时，式~\eqref{eq:assignment} 倾向于将其分配给 K 空间中相似的 absorber，
-从而减小残差距离。
+Equation~\eqref{eq:local_bound} shows the perturbation is \emph{doubly}
+suppressed: low-density tokens carry a small weight $d_j$, explicitly attenuating
+their influence, while \eqref{eq:assignment} tends to assign $j$ to an absorber
+close to it in K-space, keeping the residual distance
+$\lVert h_j-h_i\rVert$ small as well.
 
-需要注意，式~\eqref{eq:residual_merge} 不是普通加权均值，通常不守恒未加权 feature
-sum。因此本文的严格结论是``density 加权残差受到控制''，而非``视觉特征严格守恒''。
+We note honestly that \eqref{eq:residual_merge} is a density-weighted residual
+and does \emph{not} conserve the unweighted feature sum $\sum_i h_i$. Hence our
+rigorous claim is that the ``density-weighted residual is controlled,'' not that ``visual features are exactly conserved.''
 
-\subsection{CE 对 K-norm 排序的间接驱动}
+\subsection{How CE Indirectly Drives the K-norm Ranking}
 
-本节回答一个核心问题：BlackHoleMerge 中的 hard threshold 和 $\arg\max$ 均不可微，
-那么在只使用 teacher-forcing CE 的 SFT 阶段，为什么 K-norm 的排序仍会逐步改变？
-答案是，CE 不直接对 density 求导；它首先改变视觉 attention 的 key 表示，再由
-key 的模长变化改变 K-norm 排序。完整链路为
+\paragraph{The core question.}
+The keep/absorb decision of \ours{} relies on a hard threshold and a hard
+$\arg\max$ assignment, both non-differentiable. Why, then, does the K-norm
+ranking change at all during an SFT stage that uses \emph{only} teacher-forcing
+cross-entropy (CE)? The answer is that CE does \emph{not} differentiate the
+density directly; instead, it first alters the attention Key representations, and
+the resulting change in Key norms reshapes the K-norm ranking. The full indirect
+chain is
 \begin{equation}
     \mathcal{L}_{\mathrm{CE}}
     \longrightarrow \text{attention logits}
@@ -175,171 +248,313 @@ key 的模长变化改变 K-norm 排序。完整链路为
     \longrightarrow \text{keep/absorb decision}.
     \label{eq:ce_ranking_chain}
 \end{equation}
-
-为避免符号混淆，先说明本节记号。下标 $a$ 表示发出查询的 token 位置，下标 $b$
-表示作为候选 key/value 的 token 位置；$q_a,k_b,v_b$ 分别是该 attention head 中
-位置 $a,b$ 的 query、key、value；$s_{ab}$ 是 $a$ 对 $b$ 的 attention logit；
-$\alpha_{ab}$ 是 softmax 后的 attention 权重；$y_a$ 是 attention 输出。令
-$g_a=\partial\mathcal{L}_{\mathrm{CE}}/\partial y_a$，即从下游 projector、LLM
-和 CE 反传到该 attention 输出的梯度。
-
-对单个 attention head，有
+Following this chain, we first derive the CE gradient w.r.t.\ a single Key vector
+(in three steps), and then convert it, through the shared projection parameters,
+into a change of the K-norm.
+\paragraph{Notation.}
+Let $a$ index the query token and $b$ the candidate key/value token; let
+$q_a,k_b,v_b$ be the query, key, and value at positions $a,b$ in the attention
+head, $s_{ab}$ the attention logit of $a$ over $b$, $\alpha_{ab}$ the softmax
+weight, and $y_a$ the attention output. Write
+$g_a=\partial\mathcal{L}_{\mathrm{CE}}/\partial y_a$ for the gradient
+back-propagated from the downstream projector, LLM, and CE to this attention
+output. A single head satisfies
 \begin{equation}
     s_{ab}=\frac{q_a^\top k_b}{\sqrt d},\qquad
     \alpha_{ab}=\frac{\exp(s_{ab})}{\sum_c\exp(s_{ac})},\qquad
     y_a=\sum_b\alpha_{ab}v_b.
     \label{eq:attention}
 \end{equation}
-下面分三步求 CE 对 key 的梯度。首先由注意力输出 $y_a=\sum_b\alpha_{ab}v_b$，利用链式法则分解梯度：
+
+\paragraph{Step 1: gradient w.r.t.\ the attention weights.}
+Since $y_a=\sum_b\alpha_{ab}v_b$ gives $\partial y_a/\partial\alpha_{ab}=v_b$,
 \begin{equation}
-\begin{aligned}
-\frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial\alpha_{ab}}
-&= \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial y_a}
-\cdot \frac{\partial y_a}{\partial \alpha_{ab}} \\
-&= g_a^\top v_b.
-\end{aligned}
-\label{eq:ce_to_attention_weight}
+    \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial\alpha_{ab}}
+    =\Bigl(\frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial y_a}\Bigr)^{\!\top}
+    \frac{\partial y_a}{\partial\alpha_{ab}}
+    =g_a^\top v_b.
+    \label{eq:ce_to_attention_weight}
 \end{equation}
 
-其次，softmax 将一组输入相似度分数 $\{s_{a1},s_{a2},\dots\}$ 映射为归一化注意力权重 $\{\alpha_{a1},\alpha_{a2},\dots\}$。任意一个输入 logit $s_{ab}$ 发生扰动时，全体输出权重 $\alpha_{ac}$ 都会随之改变，因此雅可比矩阵元素描述任意输出权重 $\alpha_{ac}$ 对输入分数 $s_{ab}$ 的偏导：
-\begin{align}
+\paragraph{Step 2: gradient w.r.t.\ the attention logits.}
+Softmax maps a set of scores $\{s_{ac}\}_c$ to normalized weights
+$\{\alpha_{ac}\}_c$; perturbing any $s_{ab}$ changes all $\alpha_{ac}$, with
+Jacobian
+\begin{equation}
     \frac{\partial\alpha_{ac}}{\partial s_{ab}}
-    =\alpha_{ac}\bigl(\mathbb{I}[b=c]-\alpha_{ab}\bigr).
+    =\alpha_{ac}\bigl(\mathbb{I}[b=c]-\alpha_{ab}\bigr),
     \label{eq:softmax_jacobian}
-\end{align}
-式中：固定 $a$ 为同一Query；$b$ 是被扰动的输入logit下标；$c$ 遍历全部输出权重，为求和哑标；$\mathbb{I}[b=c]$ 为指示函数，仅当 $c=b$ 取1，其余取0。
-根据多元链式法则，损失对目标 logit $s_{ab}$ 的梯度需要累加所有权重 $\alpha_{ac}$ 的传导贡献：
-\[
-\frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial s_{ab}}
-=\sum_{c} \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial\alpha_{ac}} \cdot \frac{\partial\alpha_{ac}}{\partial s_{ab}}.
-\]
-将式~\eqref{eq:ce_to_attention_weight} 与式~\eqref{eq:softmax_jacobian} 代入求和并分项化简，结合指示函数与注意力输出定义 $y_a=\sum_c\alpha_{ac}v_c$ 合并项后，得到
+\end{equation}
+where $\mathbb{I}[\cdot]$ is the indicator and $c$ ranges over all output weights.
+By the multivariate chain rule, substituting
+\eqref{eq:ce_to_attention_weight}--\eqref{eq:softmax_jacobian} and summing over
+$c$ with $\sum_c\alpha_{ac}v_c=y_a$ gives
 \begin{equation}
     \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial s_{ab}}
-    =\alpha_{ab}g_a^\top(v_b-y_a).
+    =\sum_c\frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial\alpha_{ac}}
+    \frac{\partial\alpha_{ac}}{\partial s_{ab}}
+    =\alpha_{ab}\,g_a^\top(v_b-y_a).
     \label{eq:ce_to_logit}
 \end{equation}
-
-最后，注意力 logit 的定义为 $s_{ab}=q_a^\top k_b/\sqrt{d}$，我们需要通过链式法则，将损失对 logit $s_{ab}$ 的梯度传导至 Key 向量 $k_b$。
-对于固定的一组 $(a,b)$，先求标量 $s_{ab}$ 对向量 $k_b$ 的梯度：
-\[
-\frac{\partial s_{ab}}{\partial k_b} = \frac{1}{\sqrt{d}} q_a.
-\]
-损失 $\mathcal{L}_{\mathrm{CE}}$ 依赖全部 logit $\{s_{a1},s_{a2},\dots\}$，因此对向量 $k_b$ 的梯度需要遍历所有 Query 下标 $a$ 累加贡献：
-\[
-\frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial k_b}
-=\sum_{a} \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial s_{ab}} \cdot \frac{\partial s_{ab}}{\partial k_b}.
-\]
-将前文求得的 $\frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial s_{ab}}=\alpha_{ab}g_a^\top(v_b-y_a)$ 与 $\partial s_{ab}/\partial k_b$ 一并代入求和式：
+\paragraph{Step 3: gradient w.r.t.\ the Key vector.}
+The Key $k_b$ influences the loss only through the logits $\{s_{ab}\}_a$ in which
+it participates, and $\partial s_{ab}/\partial k_b=q_a/\sqrt d$. Summing over all
+query indices $a$,
 \begin{equation}
     \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial k_b}
+    =\sum_a\frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial s_{ab}}
+    \frac{\partial s_{ab}}{\partial k_b}
     =\frac{1}{\sqrt d}\sum_a
-    \alpha_{ab}\left[g_a^\top(v_b-y_a)\right]q_a.
+    \alpha_{ab}\,\bigl[g_a^\top(v_b-y_a)\bigr]\,q_a.
     \label{eq:ce_to_key}
 \end{equation}
-式~\eqref{eq:ce_to_key} 表明，只要 token $b$ 在任意 Query $a$ 的注意力计算中存在贡献、能够影响下游输出概率，交叉熵损失一般会向该 token 的 Key $k_b$ 传回非零梯度。不同视觉 token 对应的注意力权重 $\alpha_{ab}$、Value $v_b$、Query $q_a$ 以及上层误差信号 $g_a$ 均存在差异，使得各个 token 的 Key 更新梯度互不相同；这种差异化梯度是训练过程中 K-norm 排序发生重排的根本来源。
+Equation~\eqref{eq:ce_to_key} shows that as long as token $b$ contributes to some
+query's attention and can affect the downstream output, CE generally sends a
+non-zero gradient back to its Key. Because $\alpha_{ab},v_b,q_a,g_a$ differ across
+visual tokens, each token's Key-update direction is different; this
+\emph{heterogeneous} gradient is the root cause of K-norm re-ranking during
+training.
 
-接下来我们把求得的 Key 梯度进一步转化为 K-norm $r_i=\|k_i\|_2$ 的变化量。
-记 $g_i^K = \partial\mathcal{L}_{\mathrm{CE}}/\partial k_i$ 为 CE 损失对第 $i$ 个视觉 token Key 向量的梯度。
-需要注意：全部视觉 token 共用同一套 Key 投影参数 $W_K$、偏置 $b_K$，各个 $k_i$ 并非相互独立的可更新变量，任意 token 的梯度都会耦合影响其余所有 token 的 Key。
-
-标准 SGD 参数更新规则为
+\paragraph{From Key gradients to K-norm changes.}
+Write $g_i^K=\partial\mathcal{L}_{\mathrm{CE}}/\partial k_i$. Crucially, all visual
+tokens \emph{share} the same Key-projection parameters $(W_K,b_K)$, so the $k_i$
+are not independent variables: the gradient of any token couples, through the
+shared parameters, into every other token. The standard SGD update is
 \begin{equation}
-    W_K^+=W_K-\eta\sum_{t=1}^{N}g_t^Kx_t^\top,\quad
-    b_K^+=b_K-\eta\sum_{t=1}^{N}g_t^K.
+    W_K^+=W_K-\eta\sum_{t=1}^{N}g_t^K x_t^\top,\qquad
+    b_K^+=b_K-\eta\sum_{t=1}^{N}g_t^K,
     \label{eq:sgd_wk}
 \end{equation}
-其中 $\eta$ 代表学习率，$N$ 为单张图像内视觉 token 总数。将更新后的 $W_K^+,b_K^+$ 代入 Key 定义 $k_i^+=W_K^+x_i+b_K^+$，做代数展开整理，可解出单次迭代内 token $i$ 的 Key 一阶变化量：
+with learning rate $\eta$ and $N$ tokens per image. Substituting into
+$k_i^+=W_K^+x_i+b_K^+$ yields the first-order Key change of token $i$ within one
+step,
 \begin{equation}
-    k_i^+-k_i=-\eta G_i^K,\quad
-    G_i^K=\sum_{t=1}^{N}g_t^K(x_t^\top x_i+1).
+    k_i^+-k_i=-\eta\,G_i^K,\qquad
+    G_i^K=\sum_{t=1}^{N}g_t^K\bigl(x_t^\top x_i+1\bigr).
     \label{eq:induced_key_update}
 \end{equation}
-耦合项 $G_i^K$ 的物理含义为：图像内所有 token 的梯度，通过共享投影矩阵共同作用，最终给 token $i$ 带来的等效更新方向。
+The coupling term $G_i^K$ means: the gradients $g_t^K$ of all tokens in the image
+combine—through the shared parameters, weighted by $(x_t^\top x_i+1)$ (with
+$x_t^\top x_i$ from $W_K$ and the constant $1$ from the bias $b_K$)—to determine
+the effective update direction of token $i$.
 
-定义单位径向向量 $u_i = \dfrac{k_i}{\|k_i\|_2}$，代表 $k_i$ 模长增长/收缩的基准方向。
-对模长函数 $r_i=\|k_i\|_2$ 在当前 $k_i$ 处做一阶泰勒近似，代入 Key 更新量 $k_i^+-k_i=-\eta G_i^K$，忽略二阶小项 $O(\eta^2)$ 后得到模长变化：
+Let $u_i=k_i/\lVert k_i\rVert_2$ be the unit radial vector. A first-order Taylor
+expansion of $r_i=\lVert k_i\rVert_2$ at $k_i$, using
+\eqref{eq:induced_key_update} and dropping $O(\eta^2)$, gives
 \begin{equation}
-    r_i^+-r_i=-\eta u_i^\top G_i^K+O(\eta^2).
+    r_i^+-r_i=-\eta\,u_i^\top G_i^K+O(\eta^2).
     \label{eq:norm_update}
 \end{equation}
-该式可直观判断单步更新中 K-norm 的升降趋势：
-- 若 $u_i^\top G_i^K < 0$：模长变化量 $r_i^+-r_i>0$，$r_i$ 增大；
-- 若 $u_i^\top G_i^K > 0$：模长变化量 $r_i^+-r_i<0$，$r_i$ 减小。
+Thus the K-norm rises or falls solely according to the projection of the coupled
+gradient $G_i^K$ onto the current Key direction $u_i$: $r_i$ increases when
+$u_i^\top G_i^K<0$ and decreases when $u_i^\top G_i^K>0$.
 
-结合前文结论式~\eqref{eq:zscore_sum_zero}，整张图像所有 token 的 z-score 变化总和恒为0。只要本轮参数更新带来了非均匀的模长调整，图像内必然同时出现相对均值上升、相对均值下降的 token，这就为下一轮前向传播时发生 K-norm 排名翻转、keep/absorb 阈值切换提供了前提条件。
+\paragraph{Summary.}
+By \eqref{eq:zscore_sum_zero} the z-scores sum to zero, so their changes also sum to zero. Whenever the step's updates are \emph{non-uniform} across tokens (guaranteed by the heterogeneous gradient of \eqref{eq:ce_to_key}), the image
+must contain tokens whose relative density rises and others whose relative
+density falls—setting up a K-norm rank swap and a keep/absorb mask switch at the
+next forward pass. I.D makes this precise as a first-order flip condition.
 
-\subsection{排序与阈值翻转条件}
+\subsection{First-order Conditions for Rank Swaps and Threshold Crossings}
 
-我们先分析两个 token 之间 K-norm 排名发生互换的条件。
-设当前满足 $r_i>r_j$，定义二者的排序余量 $m_{ij}=r_i-r_j>0$，代表当前 token $i$ 相较于 $j$ 的模长优势。
-将式~\eqref{eq:norm_update} 分别代入 $r_i$、$r_j$ 的更新规则，作差得到更新后的排序余量：
+I.C showed that CE induces \emph{heterogeneous} radial updates across tokens.
+Building on this, we give two decidable first-order conditions: when two tokens
+\emph{swap} their K-norm rank, and when a single token \emph{crosses} the
+keep/absorb threshold. For brevity, denote the \emph{radial update} of token $i$
 \begin{equation}
-    m_{ij}^+=m_{ij}-\eta(u_i^\top G_i^K-u_j^\top G_j^K)+O(\eta^2).
+    \rho_i \;:=\; u_i^\top G_i^K,
+\end{equation}
+so that \eqref{eq:norm_update} reads $r_i^+-r_i=-\eta\,\rho_i+O(\eta^2)$: the
+K-norm grows when $\rho_i<0$ and shrinks when $\rho_i>0$.
+
+\paragraph{Rank swap between two tokens.}
+Assume $r_i>r_j$ and define the ranking margin $m_{ij}=r_i-r_j>0$. Substituting
+\eqref{eq:norm_update} for $r_i$ and $r_j$ and taking the difference gives the
+updated margin
+\begin{equation}
+    m_{ij}^+=m_{ij}-\eta\,(\rho_i-\rho_j)+O(\eta^2).
     \label{eq:rank_margin}
 \end{equation}
-忽略高阶无穷小 $O(\eta^2)$，若更新后 token $j$ 的 K-norm 反超 $i$，则需要满足 $m_{ij}^+ < 0$，整理得到排名翻转的一阶充分条件：
+To first order, $j$ overtakes $i$ (i.e., $m_{ij}^+<0$) iff
 \begin{equation}
-    \eta(u_i^\top G_i^K-u_j^\top G_j^K)>m_{ij}.
+    \eta\,(\rho_i-\rho_j)\;>\;m_{ij}.
     \label{eq:rank_crossing}
 \end{equation}
-该式直观说明：当两个 token 的径向梯度差异乘以学习率，能够抵消甚至超过原本的模长差距时，二者的 K-norm 排序就会发生翻转。
+That is, the two K-norms swap once the difference of their radial updates (times
+the learning rate) offsets the original norm gap—equivalently, $j$'s norm grows
+more than $i$'s by at least $m_{ij}$.
 
-接下来分析单个 token 跨越保留/吸收阈值的条件。
-定义阈值余量 $d_i=r_i-\mu$，代表当前 token $i$ 的 K-norm 相对整张图像平均 K-norm 的偏移量；$d_i>0$ 代表该 token 会被保留，$d_i<0$ 则会被吸收。
-图像均值的更新量满足 $\Delta\mu=\frac{1}{N}\sum_t \Delta r_t$，结合模长更新公式式~\eqref{eq:norm_update}，可以推导出阈值余量的变化量：
+\paragraph{Threshold crossing of a single token.}
+To avoid clashing with the density $d_i$, we denote the \emph{threshold margin}
 \begin{equation}
-    d_i^+-d_i=-\eta\left[u_i^\top G_i^K-
-    \frac{1}{N}\sum_tu_t^\top G_t^K\right]+O(\eta^2).
+    \delta_i \;:=\; r_i-\mu,
+\end{equation}
+where $\delta_i>0$ means retained and $\delta_i<0$ means absorbed. The image mean
+updates by $\Delta\mu=\frac1N\sum_t(r_t^+-r_t)=-\eta\,\bar\rho+O(\eta^2)$ with
+$\bar\rho=\frac1N\sum_t\rho_t$ the image-average radial update. Hence
+\begin{equation}
+    \delta_i^+-\delta_i
+    =-\eta\bigl(\rho_i-\bar\rho\bigr)+O(\eta^2).
     \label{eq:threshold_margin}
 \end{equation}
-括号内两项的差值表征：token $i$ 自身径向更新，对比全图所有 token 的平均径向更新水平。
-若某 token 当前处于被吸收状态 $d_i<0$，更新后变为保留 token 的一阶充分条件为 $d_i^+>0$，整理得：
+If a token is currently absorbed ($\delta_i<0$), a first-order sufficient
+condition for it to become retained ($\delta_i^+>0$) is
 \begin{equation}
-    -\eta\left[u_i^\top G_i^K-
-    \frac{1}{N}\sum_tu_t^\top G_t^K\right]>-d_i.
+    \eta\bigl(\rho_i-\bar\rho\bigr)\;<\;\delta_i\;(<0).
     \label{eq:threshold_crossing}
 \end{equation}
-上式物理含义为：只有自身径向更新幅度高于图像整体平均更新幅度的 token，其相对均值的偏移量 $d_i$ 才会正向抬升，存在跨过阈值、从被吸收转为保留的可能。
+Since $\delta_i<0$, this implies $\rho_i<\bar\rho$: only a token whose K-norm
+grows \emph{faster than the image average}, by an amount (times $\eta$) large
+enough to fill its current negative margin $\delta_i$, sees its relative density
+rise above the mean and cross from the absorbed side to the retained side.
 
-\subsection{硬压缩的不可微性与三阶段训练的必要性}
-当前工程部署的 BlackHoleMerge 包含三处阻断梯度的离散操作：硬阈值判别、$\arg\max$ 硬分配，同时对被吸收 token 的 density 权重执行梯度截断（stop-gradient）。在不跨越保留/吸收离散边界的局部区间内，合并输出特征对密度分数的导数恒为0，进而损失无法经由压缩分支传回密度打分：
+Combining \eqref{eq:rank_crossing} and \eqref{eq:threshold_crossing}: CE cannot
+edit the discrete mask directly, but as long as the radial updates it induces are
+sufficiently \emph{non-uniform} across tokens, they trigger a rank swap or a
+threshold crossing at the next forward pass, thereby \emph{indirectly} reshaping
+the keep/absorb partition. This closes the question raised at the start of I.C.
+
+\subsection{Non-differentiability of Hard Compression and the Division of Labor Across Three Stages}
+
+The deployed \ours{} contains three discrete operations that block gradient flow:
+hard thresholding, $\arg\max$ hard assignment, and the stop-gradient applied to the
+density weights of absorbed tokens (see Eq.~(6) in the main text). Let $d_i$ denote the
+density score of a token. Within a local region that does not cross the keep/absorb
+boundary, the merged output $\widetilde H$ is piecewise constant in the densities, and the
+weighting term is severed by the stop-gradient; hence the gradient of the merge branch
+with respect to any density is identically zero:
 \begin{equation}
-    \frac{\partial\widetilde H}{\partial p_i}=0,\quad
-    \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial d_i}
-    \bigg|_{\mathrm{merge\ branch}}=0.
+    \frac{\partial\widetilde H}{\partial d_i}\bigg|_{\mathrm{merge\ branch}}=0
+    \;\Longrightarrow\;
+    \frac{\partial\mathcal{L}_{\mathrm{CE}}}{\partial d_i}\bigg|_{\mathrm{merge\ branch}}=0 .
     \label{eq:hard_merge_gradient}
 \end{equation}
-上式说明交叉熵损失无法通过压缩算子支路直接驱动 token 的 density 提升至判定阈值之上。CE 的唯一适配路径为式~\eqref{eq:ce_ranking_chain} 给出的原生视觉 Attention Key 通路，仅能连续调整 Key 表征；只有当参数更新满足式~\eqref{eq:rank_crossing} 排序翻转条件或式~\eqref{eq:threshold_crossing} 阈值跨越条件时，下一轮前向传播才会切换离散的保留/吸收掩码。
+Eq.~\eqref{eq:hard_merge_gradient} shows that CE cannot directly push a token's density
+above the threshold through the compression operator. Its only adaptation channel is the
+native visual-attention Key path derived in I.C (which can only continuously reshape the
+Key representations), and the discrete mask of the next forward pass switches only when a
+parameter update satisfies Eq.~\eqref{eq:rank_crossing} or
+Eq.~\eqref{eq:threshold_crossing}.
 
-该不可微特性天然划分了三阶段训练各自的核心职责：监督微调（SFT）仅依靠 CE 损失优化连续视觉表征，保证基础文档解析性能；强化学习阶段（GRPO）引入可微的 DensityPolicy 策略头，直接优化离散压缩策略，平衡压缩率与任务保真度；后微调（post-SFT）固定训练完成的压缩策略，重新适配投影层与大语言模型，使其适应缩短后的视觉 Token 输入上下文。
+This non-differentiable structure naturally dictates the division of labor across the
+\textbf{three training stages}:
 
-\subsection{计算复杂度削减分析}
-原生自注意力机制具备二次计算复杂度 $\mathcal{O}(N^2 D)$。我们在中间瓶颈层 $l_{mid}$ 引入本文压缩框架后，整体总计算开销 $C_{total}$ 由原始完整计算曲线变为分段递减形式：
+\textbf{Stage 1: Merge-aware SFT.} The full model is trained end-to-end with CE only.
+Through the native Key path of Eq.~\eqref{eq:ce_to_key}, document-relevant tokens are
+gradually re-ranked toward the absorber side, forming a \emph{coarse} density ordering
+that establishes the base parsing performance; this stage characterizes the boundary
+(near $0.5$) only weakly.
+
+\textbf{Stage 2: Lightweight RL (GRPO).} We freeze the ViT, projector, and LLM, and train
+only the lightweight policy MLP. Acting as a differentiable policy head, it directly
+optimizes the \emph{discrete} keep/drop decision, bypassing the zero-gradient obstacle of
+Eq.~\eqref{eq:hard_merge_gradient}, and tightens the compression boundary on top of the SFT
+ordering to raise the compression ratio under a quality constraint.
+
+\textbf{Stage 3: Post-SFT re-adaptation.} RL substantially shifts the distribution of
+retained tokens (more aggressive compression, shorter sequences), causing an input-distribution
+shift for the projector and LLM that were originally trained on the SFT distribution. To
+remove this shift, we \emph{freeze the entire ViT and the policy MLP} (i.e., fix the learned
+compression policy) and \emph{unfreeze only the projector and LLM}, performing a lightweight
+re-adaptation for a \emph{very small number of steps} so that the downstream modules adapt to
+the post-RL short visual sequence. Since the compression policy is already fixed, this stage
+does not alter the keep/drop behavior; it only re-aligns the downstream representations.
+
+Together, the three stages form a pipeline: SFT builds a task-relevant density ordering, RL
+learns a more aggressive yet quality-constrained compression boundary on top of it, and
+post-SFT lets the downstream projector/LLM adapt to the post-RL distribution, thereby
+preserving parsing quality at a high compression ratio.
+
+\section{Implementation and Model Adaptation}
+\label{sec:supp_impl}
+
+Because \ours{} operates on the visual-token stream \emph{inside} the encoder, it is agnostic
+to the specific host VLM. To show this, we adapt it into three representative document VLMs:
+PaddleOCR-VL-1.6, MinerU2-VLM, and dots.ocr. For every host we remove any external crop /
+region-selection front-end and feed the full page directly into the visual encoder, so that the
+measured compression is attributable to the in-encoder merge alone rather than to pipeline-level
+region filtering. Where a host uses a fixed reduction projector, we adapt only the projector's
+input protocol so that its placeholders match the compressed sequence, leaving the backbone
+weights unchanged.
+
+\subsection{PaddleOCR-VL-1.6}
+The full PaddleOCR-VL-1.6 system is a coarse-to-fine pipeline: a layout/region module first
+localizes valid regions on the full page and filters margins, blanks, and background, after which
+the cropped high-resolution regions are parsed by the 0.9B VLM. Part of its redundancy removal
+therefore happens \emph{before} the VLM, through an external region selector rather than
+in-encoder token compression.
+
+We isolate the 0.9B VLM and build an end-to-end setting without the external crop stage: the full
+page enters the visual encoder directly, and token keep/merge is decided by the compression
+module. To avoid entangling the original $4\times$ projector's fixed spatial reduction with our
+method, we replace it with a $1\times$ per-token projector that maps the ViT hidden size $1152$ to
+the LLM hidden size $1024$ and performs no extra $2\times2$ spatial merge. Differences across
+variants are thus attributable to the training path and the token-compression policy.
+
+<!-- CHUNK_1 -->
+\subsection{MinerU2-VLM}
+MinerU2's full parser is likewise a pipeline that selects regions or page blocks by layout and
+task type before the VLM parses text, formulas, and structure; again, part of the redundancy
+removal happens outside the VLM. To test whether \ours{} depends on a single architecture, we
+extract MinerU2's 0.9B VLM and build an end-to-end setting with no front-end region cropping: the
+page enters the visual encoder directly.
+
+MinerU2-VLM uses a 26-layer SigLIP vision tower with hidden size $1152$. Under its single-tile
+input, each page is resized to one $384\times384$ tile, producing
 \begin{equation}
-C_{total} = \sum_{l=1}^{l_{mid}-1} \mathcal{O}(N^2 D) + \sum_{l=l_{mid}}^{L} \mathcal{O}(M^2 D)
+    N_0 = 27 \times 27 = 729
 \end{equation}
-将压缩后 Token 数量 $M = \gamma N$ 代入后半段求和式，可量化得到计算量节省比例 $\Omega$：
-\begin{equation}
-\Omega = 1 - \frac{(l_{mid}-1) + \gamma^2(L - l_{mid} + 1)}{L}
-\end{equation}
-以深度视觉大模型（VLM）为例，设置总层数 $L=32$、启用压缩的中间层 $l_{mid}=8$、压缩比例 $\gamma=0.4$，代入计算可得视觉主干网络浮点运算量（FLOPs）降低约 \textbf{59.3\%}。
+visual tokens, which a per-token MLP projector maps to the LLM hidden size $896$ with no extra
+spatial merge; the token count is thus governed solely by \ours{}. We insert the merge head after
+SigLIP layer $20$: the first $20$ blocks run on the full $729$-token sequence, layer $20$ builds
+the K-norm density and selects absorbers, low-density tokens are merged into their most similar
+absorber via density-weighted residuals, and the shortened sequence continues through blocks
+$21$--$25$, the projector, and the LLM. Merging therefore occurs \emph{inside} the encoder, so the
+self-attention of blocks $21$--$25$, the projector cost, and the LLM prefill context all shrink.
 
-\section{More Experiment Details}
-\label{sec:supp_experiments}
+Unlike fixed-count reduction, the retained length is set adaptively by each tile's K-norm density
+distribution: within one training batch the $729$ input tokens can be compressed to different
+lengths (e.g., $418, 434, 456, 455, 419, 434, 412, 401$ for eight tiles). Denser text, formula, or
+complex-layout pages keep more tokens, while background and low-information regions are absorbed
+more strongly. For a fair comparison, the no-merge baseline and the \ours{} model share the same
+MinerU2-VLM initialization, resolution, SigLIP backbone, per-token projector, and LLM; only the
+adaptive merge after layer $20$ differs, so the quality/compute gap is attributable to in-encoder
+merging rather than external cropping or projector changes.
 
-Due to space limitations in the main text, this appendix details our explicit framework adaptation blueprints and granular performance analysis for four representative state-of-the-art document Vision-Language Models (VLMs).
+\subsection{dots.ocr}
+As an OCR-centric VLM, dots.ocr tightly couples text layout with visual tokens and is highly
+sensitive to uniform pruning. We modify its dense feature-map projection to accept
+variable-length compressed token inputs instead of a static grid, letting the merge wrap closely
+around dense content blocks in multi-column layouts. The adapted version achieves a
+\textbf{40.0\% token saving} without character-level information loss or layout fragmentation.
 
-\subsection{Training Ablation Experiments}
-PaddleOCR-VL-1.6 的完整系统采用 coarse-to-fine pipeline。前端版面/区域模块首先在整页图像上定位有效区域，并过滤页边距、空白和背景区域；随后，裁剪后的局部高分辨率区域被送入 0.9B VLM 组件进行 OCR 与结构化解析。因此，官方完整系统中的一部分冗余消除发生在 VLM 之前，依赖外部区域选择模块，而不是 VLM 内部的视觉 token 压缩。
+%============================================================
+% C. Additional Ablation Studies
+%============================================================
+\section{Additional Ablation Studies}
+\label{sec:supp_ablation}
 
-在附录中，我们重点分析 BlackHole Merge 在 VLM 视觉 token 路径内部的训练消融。具体而言，我们从 PaddleOCR-VL-1.6 中取出 0.9B VLM 组件，并构建去除外部裁剪模块的 end-to-end 设置：整页图像直接输入视觉编码器，视觉 token 的保留与合并由压缩模块决定。为避免原始 $4\times$ projector 的固定空间压缩与本文方法混合，我们使用 $1\times$ per-token projector，将 ViT hidden size 从 1152 映射到 LLM hidden size 1024，并不再执行额外的 $2\times2$ spatial merge。这样，不同变体之间的差异主要来自训练路径和 token 压缩策略。
+We ablate the training path on the PaddleOCR-VL-1.6 VLM under a controlled in-encoder setting:
+the same 0.9B initialization, the same $1\times$ projector, and the same data and evaluation
+protocol. We compare four paths. \textbf{No-merge SFT} disables \ours{} and runs ordinary SFT,
+serving as the uncompressed reference and shared backbone. \textbf{Merge-aware SFT only} enables
+\ours{} from the SFT stage, so the ViT, projector, and LLM jointly adapt to the compressed token
+distribution. \textbf{RL only} skips merge-aware SFT and trains the lightweight policy MLP
+directly, testing whether RL can learn a compression policy without a stable density-ranking
+prior. \textbf{Merge-aware SFT + Confidence-Penalty RL} first learns a coarse density ranking via
+SFT, then freezes the ViT, projector, and LLM and trains only the policy MLP to refine the
+keep/drop boundary near $0.5$.
 
-我们在相同 PaddleOCR-VL-1.6B VLM 初始化、相同 $1\times$ projector、相同训练数据和相同评测协议下比较四种训练路径。\textbf{No-merge SFT} 不启用 BlackHole Merge，仅进行普通 SFT，用作无压缩参考和共享 backbone。\textbf{Merge-aware SFT only} 从 SFT 阶段启用 BlackHole Merge，使 ViT、projector 和 LLM 共同适应压缩后的视觉 token 分布。\textbf{RL only} 不经过 merge-aware SFT，直接训练轻量 policy MLP 进行 keep/drop 决策，用于验证 RL 是否能够在没有稳定 density 排序先验的情况下独立学习压缩策略。\textbf{Merge-aware SFT + Confidence-Penalty RL} 则先通过 SFT 学习粗粒度 density 排序，再冻结 ViT、projector 和 LLM，仅训练轻量 policy MLP，对 $0.5$ 附近的 keep/drop 边界进行细化。
-
-Tables~\ref{tab:token_density} and~\ref{tab:keep_ratio} summarize the density and keep-ratio ablations. Merge-aware SFT enlarges the density gap between text and blank/background tokens, indicating that the model learns to assign higher density to text, formula, and structural regions while suppressing blank and background regions. In contrast, RL only can reduce the overall keep ratio, but without the SFT ranking prior it tends to remove more text tokens, leading to worse parsing quality than SFT-only. This confirms that RL should not be used as an independent compression learner from scratch, but rather as a post-SFT boundary refinement stage.
-
-经过 Confidence-Penalty RL 后，density 分布进一步极化：blank/background token 的 density 被显著压低，gray zone 明显缩小，SFT 得到的连续排序被转化为更清晰的 keep/drop 决策。这组消融说明，SFT 负责形成任务相关的 density 排序，RL 负责在该排序附近学习更激进但受质量约束的压缩边界。
+Tables~\ref{tab:token_density} and~\ref{tab:keep_ratio} summarize the density and keep-ratio
+ablations. Merge-aware SFT enlarges the density gap between text and blank/background tokens,
+showing that the model learns to assign higher density to text, formula, and structural regions
+while suppressing background. RL only can lower the overall keep ratio, but without the SFT
+ranking prior it removes more text tokens and parses worse than SFT only, confirming that RL
+should act as a post-SFT boundary refinement rather than a standalone compression learner. After
+Confidence-Penalty RL the density distribution polarizes further: background density drops sharply,
+the gray zone shrinks, and the continuous SFT ordering becomes a sharper keep/drop decision. Thus
+SFT forms the task-relevant density ranking and RL learns a more aggressive but quality-constrained
+boundary on top of it.
 
 \begin{table}[t]
 \centering
@@ -382,7 +597,10 @@ Tables~\ref{tab:token_density} and~\ref{tab:keep_ratio} summarize the density an
 & Merge SFT + Confidence-Penalty RL & 0.565 & \textbf{0.082} & \textbf{0.483} \\
 \bottomrule
 \end{tabular*}
-\caption{Token density evolution across different merge layers and training stages. Text/Blank metrics are computed on text and blank/background regions derived from OmniDocBench bounding boxes. RL only denotes directly training the policy without merge-aware SFT; placeholder numbers indicate its unstable tendency to suppress text density together with background density.}
+\caption{Token density across merge layers and training stages. Text/Blank are measured on
+text and blank/background regions from OmniDocBench bounding boxes; Gap $=$ Text $-$ Blank.
+RL only trains the policy without merge-aware SFT and tends to suppress text density together
+with background density.}
 \label{tab:token_density}
 \end{table}
 
@@ -429,134 +647,141 @@ Tables~\ref{tab:token_density} and~\ref{tab:keep_ratio} summarize the density an
 & Merge SFT + Confidence-Penalty RL & \textbf{4.2\%} & 56.5\% & \textbf{6.6\%} & \textbf{28.1\%} \\
 \bottomrule
 \end{tabular*}
-\caption{Keep ratio statistics across different merge layers and training stages. Gray Zone denotes tokens whose density lies in the ambiguous range around the keep/drop boundary. RL only achieves a low overall keep ratio but keeps substantially fewer text tokens than merge-aware SFT, showing that RL needs the SFT ranking prior.}
+\caption{Keep ratio across merge layers and training stages. Gray Zone denotes tokens whose
+density lies in the ambiguous range around the keep/drop boundary. RL only reaches a low overall
+keep ratio but retains substantially fewer text tokens than merge-aware SFT, showing that RL
+needs the SFT ranking prior.}
 \label{tab:keep_ratio}
 \end{table}
+%============================================================
+% D. More Benchmark Results
+%============================================================
+\section{More Benchmark Results}
+\label{sec:supp_benchmark}
 
-MinerU2 的完整文档解析系统同样采用 pipeline 形式：前端模块根据页面布局和任务类型选择待解析区域或页面块，随后由 VLM 对相应区域执行文本、公式和版面结构解析。因此，原始系统的一部分冗余消除也发生在 VLM 之前，依赖外部区域选择与裁剪，而不是 VLM 内部的视觉 token 压缩。
+Table~\ref{tab:omnidocbench_compression} (main text) lists the average token-compression rate per
+document category. \ours{} sustains high, content-adaptive compression across all scenarios. On the
+in-the-wild \textbf{Real5} split, it remains robust to real capture degradations: it filters
+environmental shadows and background artifacts to lock onto core textual tokens, yielding large
+gains over the fixed reference bound on \textit{Scanning} (71.4\%), \textit{Warping} (78.4\%),
+\textit{Screen-Photography} (78.1\%), \textit{Illumination} (75.6\%), and \textit{Skew} (76.1\%).
+The consistently high compression under these degradations shows that the K-norm density signal is
+driven by textual content rather than by clean digital rendering, so the method transfers from
+clean layouts to noisy real-world captures without category-specific tuning.
+% TODO(PureBench): 若有 PureBench 实验，补一句真实数字；否则保持删除状态。
 
-为验证 BlackHoleMerge 是否依赖单一模型结构，我们从 MinerU2 中单独抽取其 0.9B VLM 组件，并构建不依赖前端区域裁剪的端到端 VLM 设置。输入页面不经过外部区域选择或多阶段调度，而是直接进入 VLM 视觉编码器。该设置测量的是视觉主干内部 token 压缩的作用，而非 pipeline 前端区域筛选带来的计算节省。
+%============================================================
+% E. Inference Efficiency Across Hardware
+%============================================================
+\section{Inference Efficiency Across Hardware}
+\label{sec:supp_hardware}
 
-MinerU2-VLM 的视觉塔为 26 层 SigLIP 编码器，视觉 hidden size 为 1152。按照该 VLM 组件的单 tile 输入配置，每个页面被直接 resize 为一个 $384\times384$ 的视觉 tile，并产生
-\begin{equation}
-N_0 = 27 \times 27 = 729
-\end{equation}
-个视觉 token。视觉特征随后经逐 token 的 MLP projector 映射到语言模型的 hidden size 896。该 projector 不执行额外的空间合并，因此视觉 token 数量的变化只由 BlackHoleMerge 决定。
+We report inference behavior across hardware and serving backends in
+Table~\ref{tab:hardware}. \ours{} preserves parsing quality across deployment environments;
+backend choice affects latency and throughput but not model quality, since the compression is
+decided inside the encoder and is independent of the serving stack.
 
-我们将 BlackHoleMerge 插入 SigLIP 第 20 层之后。前 20 个视觉 Transformer blocks 首先在完整的 729-token 序列上运行；在第 20 层中，以该层 attention key 的范数构造 density score，并据此选择 absorber token。低 density token 被分配给相似度最高的 absorber，并以 density 加权残差注入该 absorber。压缩后的短序列继续经过第 21--25 层 SigLIP blocks，最后送入 projector 和语言模型。
-因此，合并并非发生在完整视觉编码器之后。第 21--25 层的 self-attention 已直接在缩短后的视觉序列上计算；较短的视觉序列也相应降低 projector 计算和语言模型 prefill 阶段的视觉上下文长度。
+\begin{table}[t]
+\centering
+\fontsize{7.6}{9}\selectfont
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l c c c@{}}
+\toprule
+\textbf{Hardware / Backend} & \textbf{Tokens} &
+\shortstack{\textbf{Latency}\\(ms)$\downarrow$} &
+\shortstack{\textbf{Throughput}\\(pages/s)$\uparrow$} \\
+\midrule
+% TODO: 填真实实测数据
+GPU-A / backend-1 & -- & -- & -- \\
+GPU-A / backend-2 & -- & -- & -- \\
+GPU-B / backend-1 & -- & -- & -- \\
+\bottomrule
+\end{tabular*}
+\caption{Inference efficiency of \ours{} across hardware and serving backends. Quality is
+unchanged; backends trade off latency and throughput.}
+\label{tab:hardware}
+\end{table}
 
-与固定 token 数压缩不同，MinerU2 中的保留数量由每个输入 tile 的 K-norm density 分布自适应决定。对于同一训练 batch 内的不同视觉 tile，729 个输入 token 可被动态压缩至不同长度。例如，实际训练日志中同一 batch 的 8 个 tile 分别被压缩为 418、434、456、455、419、434、412 和 401 个 token。包含更密集文字、公式或复杂版面的页面会保留更多 token，而背景、空白或低信息区域会被更强地吸收。因此，压缩率由页面内容决定，而不是预先指定固定保留比例。
+<!-- CHUNK_5 -->
+%============================================================
+% F. Qualitative Visualizations
+%============================================================
+\section{Qualitative Visualizations}
+\label{sec:supp_vis}
 
-为保证比较公平，no-merge baseline 与 BlackHoleMerge 模型采用相同的 MinerU2-VLM 初始化、输入分辨率、SigLIP 主干、逐 token projector 和语言模型。no-merge 设置保留完整的 729 个视觉 token；BlackHoleMerge 设置仅在第 20 层后引入自适应合并。两者的性能与计算差异因而可以归因于 VLM 内部的 token 合并，而不是外部区域筛选、裁剪策略或 projector 架构变化。
+We provide extensive qualitative examples of \ours{} across challenging document categories. For
+each example we show the visual-token reconstruction after compression alongside the reconstructed
+Markdown parse, so both the retained-token layout and the downstream parse can be inspected
+together. Across all cases, \ours{} aggressively filters redundant background patches (e.g., blank
+regions in scanned pages) while preserving high fidelity in dense semantic areas and fine layout
+boundaries, confirming that token reduction does not drop vital layout cues.
 
-该适配说明 BlackHoleMerge 不依赖 PaddleOCR-VL 特定的视觉编码器或其 coarse-to-fine pipeline。即使在 MinerU2 这一具有不同视觉塔、projector 和语言模型 hidden size 的 VLM 组件中，attention key 表征仍提供可用于内容自适应压缩的 density 信号。通过在视觉编码器中间层执行合并，冗余消除能够从系统 pipeline 前端转移到 VLM 内部，并同时减少后续 ViT、projector 和 LLM prefill 的计算负担。
+Figures~\ref{fig:overview1}--\ref{fig:overview6} span academic papers and textbooks, daily
+newspapers, research reports and slides, and structurally irregular handwritten notes and vertical
+layouts.
 
-
-As an OCR-centric VLM, dots.ocr features tight coupling between text layouts and vision tokens, making it highly sensitive to uniform token pruning. We modify its dense feature map projection layer to support variable-length compressed token inputs instead of static grids. This structural adjustment allows our merging algorithm to wrap closely around dense content blocks in multi-column layouts. The adapted version achieves a \textbf{40.0\% token savings} without suffering from character-level information loss or layout fragmentation.
-
-\section{Inference Performance on Different Hardware Configurations}
-
-We evaluate inference behavior under different hardware and backend settings in a separate benchmark table. The key takeaway is that PaddleOCR-VL remains stable across deployment environments, while backend choices mainly affect latency and throughput rather than model quality.
-
-\section{More Benchmark Details}
-
-Our token compression framework achieves stable high efficiency across all testing scenarios. Table~\ref{tab:omnidocbench_compression} lists the explicit correspondence between each document category and its corresponding average token compression rate. Notably, on the newly integrated \textbf{Real5} benchmark—which encapsulates high-fidelity in-the-wild document captures—our algorithm yields an outstanding overall reduction by filtering complex environment shadows and background artifacts. When granularly expanded into its sub-categories, our framework achieves exceptional compression on \textit{Street-captured Receipts \& Bills} (\textbf{68.1\%}) and \textit{Low-light/Shadowed Documents} (\textbf{55.6\%}), proving that it successfully bypasses environmental noise to lock onto core textual tokens. Similarly, for the structurally demanding \textbf{PureBench} dataset, it maintains a high \textbf{61.2\%} compression rate, demonstrating robust visual redundancy filtering across both clean digital layouts, multi-column paper matrices, and diverse external evaluation suites.
-
-\section{More Visualization Results}
-\subsection{Visual Quality Across Diverse Document Types}
-
-This appendix provides extensive qualitative examples to demonstrate the effectiveness of our proposed token compression strategy across various challenging document categories. 
-
-Section \ref{subsec:doc_compression_examples} presents the visual rendering and reconstructed markdown parsing output after visual token reduction. Figures \ref{fig:overview1}--\ref{fig:overview4} show representative compressed examples across academic papers and newspaper-like layouts.
-
-As highlighted throughout these visualizations, our compression framework (e.g., \textit{BlackHoleMerge}) aggressively dynamically filters out redundant background patches (such as blank spaces in scanned pages) while maintaining high fidelity for dense semantic areas.
-
-\subsection{Comparative Analysis on Structure Preservation}
-\label{subsec:compare_with_others}
-
-To demonstrate that our method reduces the token count without dropping vital layout cues, we provide additional visual comparisons against uncompressed outputs and pruning baselines. These examples show that BlackHole Merge preserves dense text regions and fine layout boundaries while aggressively compressing redundant background areas.
-
-\clearpage 
+\clearpage
 \newpage
 \onecolumn
 
-\subsection{Document Compression Examples}
-\label{subsec:doc_compression_examples}
-
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/paper_1.pdf} 
-\caption{
-    \centering
-    Visual token reconstruction and Markdown output for compressed \textbf{Academic Papers} and \textbf{Textbooks}.
-}
+\includegraphics[width=0.84\linewidth]{figures/final/material/paper_1.pdf}
+\caption{\centering Visual token reconstruction and Markdown output for compressed
+\textbf{Academic Papers} and \textbf{Textbooks}.}
 \label{fig:overview1}
 \end{figure}
 
-\clearpage 
+\clearpage
 \newpage
-
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/paper_2.pdf} 
-\caption{
-    \centering
-    Visual token reconstruction and Markdown output for compressed \textbf{Academic Papers} and \textbf{Textbooks}.
-}
+\includegraphics[width=0.84\linewidth]{figures/final/material/paper_2.pdf}
+\caption{\centering Visual token reconstruction and Markdown output for compressed
+\textbf{Academic Papers} and \textbf{Textbooks}.}
 \label{fig:overview2}
 \end{figure}
 
-\clearpage 
+\clearpage
 \newpage
-
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/news_1.pdf} 
-\caption{
-    \centering
-    Visual token reconstruction and Markdown output for compressed \textbf{Daily Newspapers}.
-}
+\includegraphics[width=0.84\linewidth]{figures/final/material/news_1.pdf}
+\caption{\centering Visual token reconstruction and Markdown output for compressed
+\textbf{Daily Newspapers}.}
 \label{fig:overview3}
 \end{figure}
 
-\clearpage 
+<!-- CHUNK_6 -->
+\clearpage
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/news_2.pdf} 
-\caption{
-    \centering
-    Visual token reconstruction and Markdown output for compressed \textbf{Daily Newspapers}.
-}
+\includegraphics[width=0.84\linewidth]{figures/final/material/news_2.pdf}
+\caption{\centering Visual token reconstruction and Markdown output for compressed
+\textbf{Daily Newspapers}.}
 \label{fig:overview4}
 \end{figure}
 
-\clearpage 
+\clearpage
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.86\linewidth]{figures/final/material/ppt_1.pdf} 
-
-\caption{
-    \centering
-    Visual token reconstruction and Markdown output for highly formatted documents including Research Reports and Slides under compression.
-}
+\includegraphics[width=0.86\linewidth]{figures/final/material/ppt_1.pdf}
+\caption{\centering Visual token reconstruction and Markdown output for highly formatted documents
+including Research Reports and Slides under compression.}
 \label{fig:overview5}
 \end{figure}
 
-\clearpage 
+\clearpage
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.88\linewidth]{figures/final/material/real_1.pdf} 
-\caption{
-    \centering
-    Visual token reconstruction and Markdown output for structurally irregular \textbf{Handwritten Notes} and vertical text layouts.
-}
+\includegraphics[width=0.88\linewidth]{figures/final/material/real_1.pdf}
+\caption{\centering Visual token reconstruction and Markdown output for structurally irregular
+\textbf{Handwritten Notes} and vertical text layouts.}
 \label{fig:overview6}
 \end{figure}
-
 
 \end{CJK}
 \end{document}

@@ -20,6 +20,14 @@ Table~\ref{tab:omnidocbench_compare} isolates the compression rule under a contr
 
 Table~\ref{tab:omnidocbench_compression} reports category-level compression. Values in parentheses are gains over the reference compression bound (the official fixed $4\times$ down-sampling budget of PaddleOCR-VL-1.6). The learned density is content-adaptive rather than layout-fixed: sparse or background-heavy categories obtain larger gains, while text-heavy layouts retain more tokens. The negative value on Magazine is consistent with this: magazine pages are visually dense with mixed text/graphics, so fewer tokens are safely removable than the fixed bound assumes. Qualitatively, text, formulas, tables, and layout boundaries are preferentially retained while blank regions are aggressively merged.
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.8\linewidth]{figures/final/compare_3_bench.pdf}
+\caption{1}
+\label{fig:model_arch}
+\end{figure*}
+
+
 \begin{table*}[t]
 \centering
 \fontsize{6.8}{7.5}\selectfont
@@ -133,8 +141,6 @@ Table~\ref{tab:omnidocbench_compression} reports category-level compression. Val
 \label{tab:full_unified_all}
 \end{table*}
 
-Table~\ref{tab:full_unified_efficiency} and Table~\ref{tab:full_unified_parsing} show that fixed reduction in official pipelines mainly reduces tokens after the visual encoder, whereas BHM reduces tokens inside the encoder. For PaddleOCR-VL-1.6, BHM reduces the visual sequence from 4954 tokens to about 1400 retained tokens, lowering both the later ViT cost and LLM prefill cost while maintaining competitive parsing quality.
-
 \begin{table}[t]
 \centering
 \fontsize{7.6}{8.8}\selectfont
@@ -166,36 +172,3 @@ BlackHoleMerge-L9  & 0.049 & 95.50 & 87.62 & 91.04 & 0.138 & 92.76 \\
 \end{table}
 
 Table~\ref{tab:omnidocbench_compare} isolates the compression rule under a controlled VLM-only setting. The style baselines are attached to the same no-merge SFT backbone and matched to a similar token budget, while \ours{} uses merge-aware SFT and RL from the same initialization. Under this protocol, BlackHole Merge preserves OCR quality much better than training-free pruning or merging styles, showing that adapting the backbone to the compression path is important for document parsing.
-
-\begin{table}[t]
-  \fontsize{8.5}{10.0}\selectfont
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\arraystretch}{1.2}
-\centering
-\begin{tabular}{>{\raggedright\arraybackslash}m{0.54\linewidth}|>{\centering\arraybackslash}m{0.39\linewidth}}
-\toprule
-\multicolumn{1}{c|}{\textbf{Benchmark / Sub-Category}} & \textbf{Avg. Token Compression Rate ($\uparrow$)} \\
-\midrule
-\multicolumn{2}{l}{\textit{OmniDocBench v1.6 Split}} \\
-PPT       & 79.82\% (\textit{+17.97\%}) \\
-Book      & 75.20\% (\textit{+10.83\%}) \\
-Paper     & 64.49\% (\textit{+10.27\%}) \\
-Exam      & 65.32\% (\textit{+4.52\%})  \\
-Textbook  & 75.57\% (\textit{+5.53\%})  \\
-Newspaper & 41.17\% (\textit{+0.52\%})  \\
-Magazine  & 56.81\% (\textit{-16.32\%}) \\
-Report    & 74.89\% (\textit{+18.09\%}) \\
-Note      & 74.12\% (\textit{+22.79\%}) \\
-\midrule
-\multicolumn{2}{l}{\textit{Real5-OmniDocBench Split}} \\
-Scanning               & 71.36\% (\textit{+26.93\%}) \\
-Warping  & 78.36\% (\textit{+33.93\%}) \\
-Screen-Photography & 78.07\% (\textit{+33.64\%}) \\
-Illumination & 75.55\% (\textit{+31.12\%}) \\
-Skew & 76.14\% (\textit{+31.71\%}) \\
-\bottomrule
-\end{tabular}
-   \caption{Average visual-token compression rates across document sub-categories on OmniDocBench v1.6 and Real5-OmniDocBench. Values in parentheses denote improvements over the corresponding reference compression bound.}
-   \label{tab:omnidocbench_compression}
-\end{table}
-
