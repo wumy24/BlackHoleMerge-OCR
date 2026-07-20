@@ -5,13 +5,6 @@ When reading a document page, humans essentially do two things at once. The firs
 
 Interestingly, these two behaviors map onto two facets of end-to-end document VLMs. By mapping a full page image directly to structured output, such VLMs realize \emph{ordered reading} for free through autoregressive decoding: they produce results in reading order without separate detection or ordering modules, which is precisely what justifies drawing the human-reading analogy for document parsing.
 
-\begin{figure}[!b]
-\centering
-\includegraphics[width=0.92\linewidth]{figures/final/begin_pic.pdf}
-\caption{Human reading decomposes into two simultaneous behaviors: \emph{ordered reading}, which serializes the two-dimensional page into a one-dimensional semantic sequence (reading-order arrows), and \emph{adaptive attention allocation}, which spends more attention on information-dense regions (text, formulas, tables) while compressing low-information background rather than discarding it. \ours{} brings the second, largely missing behavior inside an end-to-end document VLM.}
-\label{fig:teaser}
-\end{figure}
-
 However, VLMs inherit only the first half of human reading and largely drop the second---\emph{adaptive attention allocation}. A high-resolution page can yield thousands of visual tokens, and a large fraction come from blank margins and low-information background, yet every token consumes the same ViT and LLM computation as a token covering text or a formula. This uniform computation is fundamentally mismatched with the highly non-uniform information distribution of a document. To our knowledge, how to let an end-to-end document VLM perform such adaptive attention allocation from within itself has been largely unexplored---this is the missing half we address.
 
 Existing compression methods each touch only part of this goal. Fixed projectors or downsampling shorten the sequence blindly, unable to tell a text-dense region from a blank one; token pruning hard-deletes discarded tokens, losing layout and background context that OCR sometimes still needs; token merging keeps more information but typically relies on a fixed ratio or global threshold that cannot follow page content; and multi-stage cropping reintroduces the very external modules that end-to-end VLMs were meant to remove. This raises our central question: \emph{without any external detector, can an end-to-end document VLM perform adaptive attention allocation from its own internal representations---deciding which visual tokens to preserve first and which information can be compressed?}
