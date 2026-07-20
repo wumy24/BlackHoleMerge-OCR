@@ -1,4 +1,5 @@
 \documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\PassOptionsToPackage{table}{xcolor}
 \usepackage[submission]{aaai2027}  % DO NOT CHANGE THIS
 \usepackage[hyphens]{url}  % DO NOT CHANGE THIS
 \usepackage{graphicx} % DO NOT CHANGE THIS
@@ -21,15 +22,27 @@
 \usepackage{multirow}
 \usepackage{CJKutf8} % Temporary: remove before submission
 
-\usepackage[table]{xcolor}
 \pdfinfo{
 /TemplateVersion (2027.1)
 }
 
 \setcounter{secnumdepth}{0}
 
+% --- Float placement tuning (placement heuristics only; does NOT touch
+%     geometry/margins/fonts owned by aaai2027.sty) ---
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.06}
+\renewcommand{\floatpagefraction}{0.7}
+\renewcommand{\dbltopfraction}{0.92}
+\renewcommand{\dblfloatpagefraction}{0.7}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+\setcounter{dbltopnumber}{3}
+
 % Custom commands
-\newcommand{\ours}{BlackHole Merge}
+\newcommand{\ours}{BlackHoleMerge}
 \newcommand{\eg}{\emph{e.g.} }
 \newcommand{\ie}{\emph{i.e.} }
 \newcommand{\cf}{\emph{cf.} }

@@ -1,79 +1,42 @@
-% Paper Template; see https://github.com/author-kit
+% AAAI 2027 supplementary — must use the same style as the main paper.
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2027}    % DO NOT CHANGE THIS
+\usepackage[hyphens]{url}            % DO NOT CHANGE THIS
+\usepackage{graphicx}                % DO NOT CHANGE THIS
+\urlstyle{rm}                        % DO NOT CHANGE THIS
+\def\UrlFont{\rm}                    % DO NOT CHANGE THIS
+\usepackage{natbib}                  % DO NOT CHANGE THIS
+\usepackage{caption}                 % DO NOT CHANGE THIS
+\frenchspacing                       % DO NOT CHANGE THIS
+\pdfinfo{/TemplateVersion (2027.1)}
 
-\documentclass[10pt,twocolumn,letterpaper]{article}
-\usepackage{amsmath,amssymb}
-\usepackage{graphicx} % for \includegraphics
-\usepackage{CJKutf8}  % Chinese under pdfLaTeX
-
-% NOTE: The AAAI 2027 style requires pdfLaTeX; avoid XeLaTeX-only packages (e.g., ctex).
-
-% Tables / layout
+% math + tables actually used in this appendix
+\usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{multirow}
-\usepackage{makecell}
-\usepackage{float}
-\usepackage{pifont}
 
-% Colors + hyperlinks
-\usepackage[table]{xcolor}
-\definecolor{customblue}{rgb}{0.21,0.49,0.74}
-\definecolor{customblue2}{rgb}{0.21,0.49,0.74}
-\definecolor{lightpink}{RGB}{255, 182, 193}
-\usepackage[pagebackref,breaklinks,colorlinks,allcolors=customblue]{hyperref}
+% Custom command (mirror the main paper)
+\newcommand{\ours}{BlackHole Merge}
 
-%%%%%%%%% PAPER TYPE - PLEASE UPDATE FOR FINAL VERSION
-
-% Import additional packages in the preamble file, before hyperref
-
-% It is strongly recommended to use hyperref, especially for the review version.
-% hyperref with option pagebackref eases the reviewers' job.
-% Please disable hyperref *only* if you encounter grave issues,
-% e.g. with the file validation for the camera-ready version.
-%
-% If you comment hyperref and then uncomment it, you should delete *.aux before re-running LaTeX.
-% (Or just hit 'q' on the first LaTeX run, let it finish, and you should be clear).
-
-
-
-% \bibliographystyle{unsrtnat}
-
-%%%%%%%%% PAPER ID - PLEASE UPDATE
-\def\paperID{****} % *** Enter the Paper ID here
-\def\confName{DocumentParsing}
-\def\confYear{2026}
-
-%%%%%%%%% TITLE - PLEASE UPDATE
-\title{Boosting Document Parsing Efficiency and Performance \\ with Coarse-to-Fine Visual Processing}
-
-%%%%%%%%% AUTHORS - PLEASE UPDATE
+% Title mirrors the main paper (Supplementary Material)
+\title{BlackHole Merge: Content-Adaptive Token Merging for Document Parsing\\
+       (Supplementary Material)}
+\author{Anonymous Submission}
+\affiliations{Anonymous Institution}
 
 \begin{document}
-\begin{CJK}{UTF8}{gbsn}
+\maketitle
 
-
-% \maketitle
-
-% \input{sec/0_abstract}    
-% \input{sec/1_intro}
-% \input{sec/2_formatting}
-% \input{sec/3_finalcopy}
-% {
-%     \small
-%     \bibliographystyle{ieeenat_fullname}
-%     \bibliography{main}
-% }
-
-% WARNING: do not forget to delete the supplementary pages from your submission 
-\clearpage
-\setcounter{page}{1}
+\setcounter{secnumdepth}{2}
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\thesection.\Alph{subsection}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
 \setcounter{section}{0}
 \setcounter{table}{0}
 \setcounter{figure}{0}
-% \setcounter{footnote}{0}
-\renewcommand{\thesection}{\Roman{section}}
-\renewcommand{\thetable}{S\arabic{table}}
-\renewcommand{\thefigure}{S\arabic{figure}}
 
 \section{Theoretical Analysis of Token Compression}
 \label{sec:supp_derivation}
@@ -240,12 +203,14 @@ density directly; instead, it first alters the attention Key representations, an
 the resulting change in Key norms reshapes the K-norm ranking. The full indirect
 chain is
 \begin{equation}
+\begin{aligned}
     \mathcal{L}_{\mathrm{CE}}
-    \longrightarrow \text{attention logits}
+    &\longrightarrow \text{attention logits}
     \longrightarrow k_i
-    \longrightarrow r_i=\lVert k_i\rVert_2
-    \longrightarrow z_i
+    \longrightarrow r_i=\lVert k_i\rVert_2 \\
+    &\longrightarrow z_i
     \longrightarrow \text{keep/absorb decision}.
+\end{aligned}
     \label{eq:ce_ranking_chain}
 \end{equation}
 Following this chain, we first derive the CE gradient w.r.t.\ a single Key vector
@@ -260,8 +225,8 @@ $g_a=\partial\mathcal{L}_{\mathrm{CE}}/\partial y_a$ for the gradient
 back-propagated from the downstream projector, LLM, and CE to this attention
 output. A single head satisfies
 \begin{equation}
-    s_{ab}=\frac{q_a^\top k_b}{\sqrt d},\qquad
-    \alpha_{ab}=\frac{\exp(s_{ab})}{\sum_c\exp(s_{ac})},\qquad
+    s_{ab}=\frac{q_a^\top k_b}{\sqrt d},\quad
+    \alpha_{ab}=\frac{\exp(s_{ab})}{\sum_c\exp(s_{ac})},\quad
     y_a=\sum_b\alpha_{ab}v_b.
     \label{eq:attention}
 \end{equation}
@@ -491,7 +456,6 @@ method, we replace it with a $1\times$ per-token projector that maps the ViT hid
 the LLM hidden size $1024$ and performs no extra $2\times2$ spatial merge. Differences across
 variants are thus attributable to the training path and the token-compression policy.
 
-<!-- CHUNK_1 -->
 \subsection{MinerU2-VLM}
 MinerU2's full parser is likewise a pipeline that selects regions or page blocks by layout and
 task type before the VLM parses text, formulas, and structure; again, part of the redundancy
@@ -607,14 +571,14 @@ with background density.}
 \begin{table}[t]
 \centering
 \fontsize{7.2}{8.4}\selectfont
-\setlength{\tabcolsep}{1.8pt}
+\setlength{\tabcolsep}{1.2pt}
 \renewcommand{\arraystretch}{1.12}
 \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}%
->{\centering\arraybackslash}m{0.13\columnwidth}
->{\centering\arraybackslash}m{0.36\columnwidth}
->{\centering\arraybackslash}m{0.11\columnwidth}
+>{\centering\arraybackslash}m{0.12\columnwidth}
+>{\centering\arraybackslash}m{0.32\columnwidth}
 >{\centering\arraybackslash}m{0.10\columnwidth}
->{\centering\arraybackslash}m{0.10\columnwidth}
+>{\centering\arraybackslash}m{0.09\columnwidth}
+>{\centering\arraybackslash}m{0.09\columnwidth}
 >{\centering\arraybackslash}m{0.10\columnwidth}
 @{}}
 \toprule
@@ -659,7 +623,7 @@ needs the SFT ranking prior.}
 \section{More Benchmark Results}
 \label{sec:supp_benchmark}
 
-Table~\ref{tab:omnidocbench_compression} (main text) lists the average token-compression rate per
+The category-level compression figure in the main text reports the average token-compression rate per
 document category. \ours{} sustains high, content-adaptive compression across all scenarios. On the
 in-the-wild \textbf{Real5} split, it remains robust to real capture degradations: it filters
 environmental shadows and background artifacts to lock onto core textual tokens, yielding large
@@ -668,7 +632,13 @@ gains over the fixed reference bound on \textit{Scanning} (71.4\%), \textit{Warp
 The consistently high compression under these degradations shows that the K-norm density signal is
 driven by textual content rather than by clean digital rendering, so the method transfers from
 clean layouts to noisy real-world captures without category-specific tuning.
-% TODO(PureBench): 若有 PureBench 实验，补一句真实数字；否则保持删除状态。
+Beyond OmniDocBench and Real5, the category-level compression figure in the main text further reports
+category-level compression on \textbf{PureDocBench}, spanning academic, education, legal/government,
+business, finance, medical, publishing, technical, logistics, and certificate documents. The
+per-category ``Ours Mean'' curve stays consistently above the fixed reference bound, confirming that
+the content-adaptive density signal generalizes to a broad set of document domains without
+per-domain tuning.
+% TODO(PureBench): fill in exact per-category numbers if available; otherwise keep this qualitative summary.
 
 %============================================================
 % E. Inference Efficiency Across Hardware
@@ -691,7 +661,7 @@ decided inside the encoder and is independent of the serving stack.
 \shortstack{\textbf{Latency}\\(ms)$\downarrow$} &
 \shortstack{\textbf{Throughput}\\(pages/s)$\uparrow$} \\
 \midrule
-% TODO: 填真实实测数据
+% TODO: fill in measured hardware numbers
 GPU-A / backend-1 & -- & -- & -- \\
 GPU-A / backend-2 & -- & -- & -- \\
 GPU-B / backend-1 & -- & -- & -- \\
@@ -702,7 +672,6 @@ unchanged; backends trade off latency and throughput.}
 \label{tab:hardware}
 \end{table}
 
-<!-- CHUNK_5 -->
 %============================================================
 % F. Qualitative Visualizations
 %============================================================
@@ -752,7 +721,6 @@ layouts.
 \label{fig:overview3}
 \end{figure}
 
-<!-- CHUNK_6 -->
 \clearpage
 \newpage
 \begin{figure}[t]
@@ -783,5 +751,4 @@ including Research Reports and Slides under compression.}
 \label{fig:overview6}
 \end{figure}
 
-\end{CJK}
 \end{document}

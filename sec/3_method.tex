@@ -1,18 +1,30 @@
 \section{Method}
 \label{sec:method}
 
-\begin{figure*}[t]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=0.8\linewidth]{figures/final/model_arch.pdf}
+\begin{subfigure}[b]{0.37\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/final/model_compare.pdf}
+\caption{Comparison of parsing pipelines. Unlike fixed compression or external region selection, \ours{} reallocates the visual-token budget inside the ViT by content density.}
+\label{fig:pipeline_compare}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.61\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/final/model_arch.pdf}
 \caption{Overview of \ours{}. A merge head at an intermediate ViT layer keeps high-density tokens and merges low-density ones by Key-vector density and similarity. Merge-aware SFT and lightweight RL refine the density boundary for stable content-adaptive compression.}
 \label{fig:model_arch}
+\end{subfigure}
+\caption{(a) Where \ours{} sits relative to existing document parsing pipelines, and (b) how it compresses visual tokens inside the ViT.}
+\label{fig:arch_overview}
 \end{figure*}
 
 \subsection{Overview}
 
-Figure~\ref{fig:model_arch} shows the layered compression framework of \ours{}. At inference, a document image is patch-embedded into 4492 visual tokens and processed by the first half of the ViT ($0\sim k{-}1$) for contextual modeling. Rather than compressing at the encoder end, we insert a bottleneck at an intermediate layer $k$. At this merge head, the L2 norm of the current-layer Key vectors estimates token density; an initial threshold of $0.5$ splits tokens into a retained side and a merged side. High-density tokens serve as absorbers, while low-density tokens are merged into them by K-vector similarity. In the example, 4492 tokens are reduced to 625 before the projector and the LLM produce structured OCR. Training shares the same bottleneck in three stages: SFT trains the full model so that text tokens tend to move to the absorber side; RL then freezes the backbone and trains only a lightweight policy to sharpen the keep/drop decisions on top of SFT; finally, because RL shifts the retained-token distribution, a short post-SFT stage freezes the entire ViT and the policy and unfreezes only the projector and LLM for a small number of steps to re-align them to the compressed sequence.
+Figure~\ref{fig:model_arch} shows the layered compression framework of \ours{}, illustrated on one example page (token counts in the figure are for that page; the number of patch tokens varies with image resolution). At inference, a document image is patch-embedded into visual tokens and processed by the first half of the ViT ($0\sim k{-}1$) for contextual modeling. Rather than compressing at the encoder end, we insert a bottleneck at an intermediate layer $k$. At this merge head, the L2 norm of the current-layer Key vectors estimates token density; an initial threshold of $0.5$ splits tokens into a retained side and a merged side. High-density tokens serve as absorbers, while low-density tokens are merged into them by K-vector similarity. In the figure's example, its 4492 patch tokens are reduced to 625 before the projector and the LLM produce structured OCR. Training shares the same bottleneck in three stages---merge-aware SFT, a lightweight RL policy, and a short post-SFT re-adaptation---detailed below.
 
-\subsection{BlackHole Merge}
+\subsection{BlackHoleMerge}
 
 \subsubsection{K-norm Density Estimation.}
 
@@ -20,7 +32,7 @@ In ViT~\cite{dosovitskiy2021vit} self-attention, tokens $X\in\mathbb{R}^{N\times
 \begin{equation}
 Q=XW_Q, \quad K=XW_K, \quad V=XW_V,
 \end{equation}
-with attention weights $\mathrm{softmax}(QK^\top/\sqrt{d_k})$. Since Key vectors determine how strongly tokens can be matched in dot-product attention, their norms provide an empirical signal of content density. We verify this on 1{,}000 OCR documents spanning newspapers, papers, slides, and other page types. As shown in Table~\ref{tab:cross_model_knorm}, across a broad range of OCR/document VLMs---PaddleOCR-VL~\cite{cui2026paddleocrvl}, dots.ocr~\cite{li2025dotsocr}, MinerU2-VLM~\cite{mineru2vlm2025}, HunyuanOCR~\cite{lyu2025hunyuanocr}, Dolphin~\cite{feng2025dolphin}, FireRed-OCR~\cite{wu2026firered}, and ABot-OCR~\cite{jiang2026abot}---text regions consistently have higher K-norms than background regions across continuous layers, indicating a common representation pattern rather than a single-model artifact.
+with attention weights $\mathrm{softmax}(QK^\top/\sqrt{d_k})$. Since Key vectors determine how strongly tokens can be matched in dot-product attention, their norms provide an empirical signal of content density. We verify this on 1{,}000 OCR documents spanning newspapers, papers, slides, and other page types. As shown in Table~\ref{tab:cross_model_knorm}, across a broad range of OCR/document VLMs---two PaddleOCR-VL versions (1.5 and 1.6)~\cite{cui2026paddleocrvl}, dots.ocr~\cite{li2025dotsocr}, MinerU2-VLM~\cite{mineru2vlm2025}, HunyuanOCR~\cite{lyu2025hunyuanocr}, Dolphin~\cite{feng2025dolphin}, FireRed-OCR~\cite{wu2026firered}, and ABot-OCR~\cite{jiang2026abot}---text regions consistently have higher K-norms than background regions across continuous layers, indicating a common representation pattern rather than a single-model artifact.
 
 \begin{table}[!htbp]
     \centering
@@ -49,7 +61,7 @@ For token $i$ at layer $k$, the raw density is $r_i=\|k_i\|_2$. To make densitie
 \begin{equation}
 z_i=\frac{r_i-\mu_r}{\sigma_r}, \quad d_i=\sigma(z_i),
 \end{equation}
-where $\mu_r,\sigma_r$ are the per-image mean and std. Since $z_i=0$ is the image-level average K-norm and maps to $d_i=0.5$, the value $0.5$ is a natural per-image boundary between above- and below-average density. We therefore aim to shift text tokens to the right of $0.5$ so they are more likely retained as absorbers.
+where $\mu_r,\sigma_r$ are the per-image mean and std. Since $z_i=0$ is the image-level average K-norm and maps to $d_i=0.5$, the value $0.5$ is a natural per-image boundary between above- and below-average density: it is \emph{derived} from the z-score normalization rather than a tuned hyperparameter, and adapts to each page automatically, so no threshold search is needed. We therefore aim to shift text tokens to the right of $0.5$ so they are more likely retained as absorbers.
 
 \subsubsection{Absorber-based Token Merging.}
 
@@ -61,14 +73,15 @@ a^*=\arg\max_{a\in\mathcal{A}}
 where the cosine term measures feature compatibility and $d_a$ favors reliable high-density absorbers. As RoPE injects positional information into Key vectors, the assignment reflects both feature similarity and spatial proximity. Key vectors are used only for assignment; the representations actually merged and passed to later layers are hidden states. For each absorber $a$ with assigned set $\mathcal{B}_a$, we aggregate density-weighted residuals:
 \begin{equation}
 \hat{h}_a=h_a+\sum_{j\in\mathcal{B}_a}d_j\cdot(h_j-h_a).
+\label{eq:merge}
 \end{equation}
 Lower-density tokens thus have weaker influence, keeping the absorber dominant while preserving part of the compressed context. The sequence is reduced from $N$ to $A$, and the compression ratio adapts to page content.
 
 To visualize the merging behavior, we count absorbees per spatial location and normalize within each image (Fig.~\ref{fig:absorb_all}). Dense text regions absorb fewer tokens, while text boundaries and text-background interfaces absorb the most: boundary tokens are more similar to surrounding blank regions and carry less independent semantics, making them natural absorption points. Thus \ours{} compresses locally at text boundaries rather than uniformly pushing background into text cores, consistent with the information-density distribution of document pages.
 
-\begin{figure}[t]
+\begin{figure}[!tb]
 \centering
-\includegraphics[width=1\linewidth]{figures/final/absorbtion_all.pdf}
+\includegraphics[width=0.7\linewidth]{figures/final/absorbtion_all.pdf}
 \caption{Token absorption heatmap of \ours{}. Colors denote the normalized number of absorbees per retained token. Most absorptions occur at text boundaries and text-background interfaces.}
 \label{fig:absorb_all}
 \end{figure}
@@ -77,23 +90,23 @@ To visualize the merging behavior, we count absorbees per spatial location and n
 
 \subsubsection{Merge-aware SFT.}
 
-In the first stage, BlackHole Merge is enabled and trained end-to-end over the full model. As shown in the SFT panel (top-left of Fig.~\ref{fig:model_arch}), all tokens are arranged along a density axis $d_i$, with $0.5$ separating the absorber area (right) from the absorbee area (left). The key role of SFT is to \emph{re-rank} tokens along this axis: two-color concentric circles mark tokens whose relative position changes and crosses the $0.5$ boundary during SFT (e.g., a text token re-ranked from the background side to the absorber side), while single-outline black tokens keep their relative position. Since density is normalized within each image, a change in any token's relative importance shifts the ordering of others, yielding a global re-ranking effect. This lets SFT rapidly reduce CE while moving OCR-relevant tokens to the absorber side (right of $0.5$) and blank background tokens to the absorbee side (left).
+In the first stage, BlackHoleMerge is enabled and trained end-to-end over the full model. As shown in the SFT panel (top-left of Fig.~\ref{fig:model_arch}), all tokens are arranged along a density axis $d_i$, with $0.5$ separating the absorber area (right) from the absorbee area (left). The key role of SFT is to \emph{re-rank} tokens along this axis: two-color concentric circles mark tokens whose relative position changes and crosses the $0.5$ boundary during SFT (e.g., a text token re-ranked from the background side to the absorber side), while single-outline black tokens keep their relative position. Since density is normalized within each image, a change in any token's relative importance shifts the ordering of others, yielding a global re-ranking effect. This lets SFT rapidly reduce CE while moving OCR-relevant tokens to the absorber side (right of $0.5$) and blank background tokens to the absorbee side (left).
 
 To prevent CE from directly manipulating density weights and weakening compression, we stop the gradient of each absorbee density:
 \begin{equation}
 h_{a^*}\leftarrow h_{a^*}+\mathrm{sg}(d_j)\cdot(h_j-h_{a^*}).
 \end{equation}
-Here $\mathrm{sg}(d_j)$ controls only the forward merging strength, so gradients update the ViT hidden states and Key representations, which in turn reshape the density ranking in later passes. However, this effect is coarse: once the main text regions are separated, optimization saturates and the boundary stays uncertain. As shown in Fig.~\ref{fig:sft_curve}, SFT reduces visual tokens and aligns density with OCR utility, yet the histogram remains scattered with many tokens in the $0.3$--$0.6$ gray zone, motivating RL for finer refinement.
+Here $\mathrm{sg}(d_j)$ controls only the forward merging strength, so gradients update the ViT hidden states and Key representations, which in turn reshape the density ranking in later passes. However, this effect is coarse: once the main text regions are separated, optimization saturates and the boundary stays uncertain. As shown in Fig.~\ref{fig:sft_rl}, SFT reduces visual tokens and aligns density with OCR utility, yet the histogram remains scattered with many tokens in the $0.3$--$0.6$ gray zone, motivating RL for finer refinement.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=\linewidth]{figures/final/wanqu_sft.pdf}
-\caption{Effect of merge-aware SFT: original layout, SFT-compressed layout, and density histogram. Many tokens remain in the $0.3$--$0.6$ gray zone, showing the keep/merge boundary is still uncertain.}
-\label{fig:sft_curve}
-\end{figure}
+\includegraphics[width=\linewidth]{figures/final/real_sft_rl.pdf}
+\caption{Density evolution across training stages on the same sample. Left: after merge-aware SFT the page is compressed to 630 tokens, but the density histogram is still scattered with many tokens in the $0.3$--$0.6$ gray zone, so the keep/merge boundary remains uncertain. Right: with the backbone frozen, the lightweight RL policy further compresses to 367 tokens and polarizes the histogram into a clearer V-shape, shrinking the mid-density region around $0.5$.}
+\label{fig:sft_rl}
+\end{figure*}
 
 \subsubsection{Lightweight RL Policy.}
-In the second stage we freeze the ViT, projector, and LLM, and train only a lightweight policy MLP ($\sim$74K parameters) that refines the keep/drop boundary on top of the SFT density ordering. Given the full Key vector $k_i$, the policy predicts a logit-space correction:
+In the second stage we freeze the ViT, projector, and LLM, and train only a lightweight policy MLP ($\sim$74K parameters) that refines the keep/drop boundary on top of the SFT density ordering. Here a ``dropped'' token is not deleted but reassigned to the absorbee side and merged into its absorber as in Eq.~(\ref{eq:merge}); the policy thus only moves the absorber/absorbee boundary, keeping the compress-not-discard behavior of \ours{}. Given the full Key vector $k_i$, the policy predicts a logit-space correction:
 \begin{equation}
 \begin{aligned}
 \mathrm{correction}_i&=\mathrm{MLP}(k_i),\\
@@ -102,7 +115,7 @@ d_i'&=\sigma\!\left(\mathrm{logit}(d_i)+\mathrm{correction}_i\right).
 \end{equation}
 Observing the full Key vector lets the policy exploit directional information beyond the norm and distinguish tokens with similar norms but different semantics, reducing the gray zone ($0.3<d<0.6$) left by SFT.
 
-We train the policy with GRPO~\cite{shao2024deepseekmath}. For each sample, we draw $K=8$ keep/drop masks from $d_i'$ and evaluate each compressed sequence with teacher-forcing CE after BlackHole Merge. Instead of the uncompressed input, the reference is the CE under the SFT hard mask:
+We train the policy with GRPO~\cite{shao2024deepseekmath}. For each sample, we draw $K=8$ keep/drop masks from $d_i'$ and evaluate each compressed sequence with teacher-forcing CE after BlackHoleMerge. Instead of the uncompressed input, the reference is the CE under the SFT hard mask:
 \begin{equation}
 \mathrm{CE}_{\mathrm{base}}
 =\mathrm{TeacherForcing}(\mathrm{SFT\ hard\ mask},\mathrm{GT}),
@@ -130,34 +143,20 @@ A_k=\Delta\mathrm{CE}_k\left(1+\mathrm{drop\_conf}_k\right),
 \end{equation}
 where $\mathcal{S}_{\mathrm{sft}}$ are tokens kept by the SFT hard mask and $\mathcal{S}_{\mathrm{drop}}$ are high-confidence tokens additionally removed by the rollout. This encourages higher compression when quality holds, while penalizing masks that drop text or structural tokens confidently kept by SFT.
 
-GRPO thus needs no token-level keep/drop labels, refining the boundary through relative comparison among masks of the same input. As shown in Fig.~\ref{fig:rl_curve}, the density distribution after RL is more polarized than SFT, the gray zone shrinks into a clearer V-shape, and the policy MLP further compresses the SFT output from 630 to 367 tokens with the backbone frozen.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/final/wanqu_rl.pdf}
-\caption{RL refinement on the same sample. With the backbone frozen, the policy MLP compresses the SFT output from 630 to 367 tokens; the histogram shows clearer separation and a smaller mid-density region around $0.5$.}
-\label{fig:rl_curve}
-\end{figure}
+GRPO thus needs no token-level keep/drop labels, refining the boundary through relative comparison among masks of the same input. As shown in Fig.~\ref{fig:sft_rl}, the density distribution after RL is more polarized than SFT, the gray zone shrinks into a clearer V-shape, and the policy MLP further compresses the SFT output from 630 to 367 tokens with the backbone frozen.
 
 \subsubsection{Post-SFT Re-adaptation.}
 RL substantially sharpens the keep/drop boundary and shortens the retained visual sequence, which shifts the input distribution seen by the projector and the LLM away from the one they were trained on during merge-aware SFT. To close this gap, we run a short post-SFT stage that freezes the entire ViT and the RL-trained policy MLP—keeping the learned compression behavior fixed—and unfreezes only the projector and the LLM. A small number of update steps is enough to re-align these downstream modules to the post-RL short-sequence distribution; since the keep/drop decisions are frozen, this stage only recovers decoding quality and does not alter the compression.
 
 \subsubsection{Inference.}
-At inference, we use the SFT-adapted merge layer together with the GRPO-trained policy MLP for deterministic compression: visual tokens obtain density at the merge layer, the policy applies a single forward correction, and keep/drop is decided by $d_i'\ge0.5$. The compressed sequence then passes through the remaining ViT blocks, projector, and LLM for autoregressive decoding. No GRPO sampling or reward computation is performed, so the extra cost is a single lightweight density-correction pass. In complexity terms, BlackHole Merge reduces the input length of subsequent ViT blocks from $N$ to $M$, lowering the dominant self-attention cost from $O(N^2)$ to $O(M^2)$, while the merge step itself is negligible. End-to-end speedup mainly comes from the visual encoder and the LLM prefill, since far fewer visual tokens are passed downstream; decoder-side generation is bounded by output length and speeds up less, but overall latency still drops as the bottleneck shifts from long visual-sequence computation to text decoding.
+At inference, we use the SFT-adapted merge layer together with the GRPO-trained policy MLP for deterministic compression: visual tokens obtain density at the merge layer, the policy applies a single forward correction, and keep/drop is decided by $d_i'\ge0.5$. The compressed sequence then passes through the remaining ViT blocks, projector, and LLM for autoregressive decoding. No GRPO sampling or reward computation is performed, so the extra cost is a single lightweight density-correction pass. In complexity terms, BlackHoleMerge reduces the input length of subsequent ViT blocks from $N$ to $M$, lowering the dominant self-attention cost from $O(N^2)$ to $O(M^2)$, while the merge step itself is negligible. End-to-end speedup mainly comes from the visual encoder and the LLM prefill, since far fewer visual tokens are passed downstream; decoder-side generation is bounded by output length and speeds up less, but overall latency still drops as the bottleneck shifts from long visual-sequence computation to text decoding.
 
-Under the VLM-only setting of PaddleOCR-VL-1.6, Fig.~\ref{fig:overview} visualizes layer6 and layer9 on dense-text and sparse-text cases. Both show content-adaptive compression: text-heavy regions retain more tokens, background and redundant regions are merged more aggressively, and key text regions are consistently preserved, indicating that BlackHole Merge stably retains OCR-relevant information across layout patterns.
+Under the VLM-only setting of PaddleOCR-VL-1.6, Fig.~\ref{fig:overview} visualizes representative merge layers on two cases (world at layer~9 and duck at layer~6). Both show content-adaptive compression: text-heavy regions retain more tokens, background and redundant regions are merged more aggressively, and key text regions are consistently preserved, indicating that BlackHoleMerge stably retains OCR-relevant information across layout patterns.
 
-\begin{figure*}[t]
+\begin{figure}[!t]
 \centering
-\begin{minipage}{0.48\linewidth}
-\centering
-\includegraphics[width=\linewidth]{figures/final/world.pdf}
-\end{minipage}
-\hfill
-\begin{minipage}{0.48\linewidth}
-\centering
+\includegraphics[width=\linewidth]{figures/final/world.pdf}\\[3pt]
 \includegraphics[width=\linewidth]{figures/final/duck.pdf}
-\end{minipage}
-\caption{Changes in \ours{}'s compression decisions from merge-aware SFT to RL post-training. Left: world case; Right: duck case.}
+\caption{Changes in \ours{}'s compression decisions from merge-aware SFT to RL post-training. Top: world case (layer~9); bottom: duck case (layer~6).}
 \label{fig:overview}
-\end{figure*}
+\end{figure}

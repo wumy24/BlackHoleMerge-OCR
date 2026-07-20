@@ -1,17 +1,16 @@
   \section{Conclusion}
   \label{sec:conclusion}
 
-  We present \ours{}, a content-adaptive visual token compression method for document understanding. \ours{} uses
-  the L2 norm of Key vectors in Vision Transformers as an annotation-free content density signal. It preserves high-
-  density tokens as absorbers and merges low-density tokens into semantically and spatially related absorber hidden
-  states, reducing the visual sequence length while retaining useful information. To address the limitation that
-  cross-entropy training tends to preserve more visual evidence and does not directly optimize compression, we adopt
-  a two-stage training strategy. Merge-aware SFT first adapts the model to merged visual representations, and RL
-  then trains a lightweight Policy MLP with an explicit quality-compression reward to learn content-adaptive keep/
-  drop decisions.
-
-  Experiments show that \ours{} dynamically adjusts compression strength according to the information density within
-  each document page. It preserves more visual tokens in text-dense regions and applies stronger compression to
-  blank or low-information regions. Compared with fixed-ratio compression and training-free token selection methods,
-  \ours{} achieves a better balance between document parsing quality and inference efficiency.
+  We present \ours{}, a content-adaptive visual token compression method for document understanding that uses
+  the L2 norm of ViT Key vectors as an annotation-free content-density signal: it keeps high-density tokens as
+  absorbers and merges low-density tokens into semantically and spatially related absorber hidden states,
+  shortening the visual sequence while retaining useful information. Because cross-entropy training tends to
+  preserve visual evidence rather than optimize compression, we combine merge-aware SFT with a lightweight RL
+  policy that learns content-adaptive keep/drop decisions under an explicit quality--compression reward. Across
+  multiple end-to-end OCR backbones, \ours{} adapts compression strength to per-page information density---preserving
+  text-dense regions while aggressively compressing blank areas---and achieves a better balance between parsing
+  quality and inference efficiency than fixed-ratio compression and training-free token selection.
+  A current limitation is that the density signal and merge boundary are learned per backbone; extending \ours{}
+  to a wider range of document VLMs and to non-OCR multimodal tasks, and jointly learning the merge layer rather
+  than fixing it, are promising directions for future work.
 
