@@ -1,16 +1,13 @@
   \section{Conclusion}
   \label{sec:conclusion}
 
-  We present \ours{}, a content-adaptive visual token compression method for document understanding that uses
+  We present \ours{}, a content-adaptive visual token compression method that uses
   the L2 norm of ViT Key vectors as an annotation-free content-density signal: it keeps high-density tokens as
-  absorbers and merges low-density tokens into semantically and spatially related absorber hidden states,
-  shortening the visual sequence while retaining useful information. Because cross-entropy training tends to
+  absorbers and merges low-density ones into semantically and spatially related absorbers,
+  shortening the visual sequence while retaining useful context. Because cross-entropy training tends to
   preserve visual evidence rather than optimize compression, we combine merge-aware SFT with a lightweight RL
-  policy that learns content-adaptive keep/drop decisions under an explicit quality--compression reward. Across
-  multiple end-to-end OCR backbones, \ours{} adapts compression strength to per-page information density---preserving
-  text-dense regions while aggressively compressing blank areas---and achieves a better balance between parsing
-  quality and inference efficiency than fixed-ratio compression and training-free token selection.
-  A current limitation is that the density signal and merge boundary are learned per backbone; extending \ours{}
-  to a wider range of document VLMs and to non-OCR multimodal tasks, and jointly learning the merge layer rather
-  than fixing it, are promising directions for future work.
+  policy that learns keep/drop decisions under an explicit quality--compression reward. Across
+  multiple end-to-end OCR backbones, \ours{} adapts compression to per-page information density and achieves a better quality--efficiency
+  balance than fixed-ratio compression and training-free token selection.
+  A current limitation is that the density signal and merge boundary are learned per backbone; extending \ours{} to non-OCR tasks and jointly learning the merge layer are promising directions.
 

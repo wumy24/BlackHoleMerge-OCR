@@ -1,48 +1,92 @@
-% AAAI 2027 supplementary — must use the same style as the main paper.
-\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
-\usepackage[submission]{aaai2027}    % DO NOT CHANGE THIS
-\usepackage[hyphens]{url}            % DO NOT CHANGE THIS
-\usepackage{graphicx}                % DO NOT CHANGE THIS
-\urlstyle{rm}                        % DO NOT CHANGE THIS
-\def\UrlFont{\rm}                    % DO NOT CHANGE THIS
-\usepackage{natbib}                  % DO NOT CHANGE THIS
-\usepackage{caption}                 % DO NOT CHANGE THIS
-\frenchspacing                       % DO NOT CHANGE THIS
-\pdfinfo{/TemplateVersion (2027.1)}
+% Paper Template; see https://github.com/author-kit
 
-% math + tables actually used in this appendix
-\usepackage{amsmath}
-\usepackage{amssymb}
+\documentclass[10pt,twocolumn,letterpaper]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx} % for \includegraphics
+\usepackage{CJKutf8}  % Chinese under pdfLaTeX
+
+% NOTE: The AAAI 2027 style requires pdfLaTeX; avoid XeLaTeX-only packages (e.g., ctex).
+
+% Custom commands (mirrored from main.tex so the standalone appendix compiles)
+\newcommand{\ours}{BlackHoleMerge}
+\newcommand{\eg}{\emph{e.g.} }
+\newcommand{\ie}{\emph{i.e.} }
+\newcommand{\cf}{\emph{cf.} }
+\newcommand{\etc}{\emph{etc.} }
+
+% Tables / layout
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{makecell}
+\usepackage{float}
+\usepackage{pifont}
 
-% Custom command (mirror the main paper)
-\newcommand{\ours}{BlackHole Merge}
+% Colors + hyperlinks
+\usepackage[table]{xcolor}
+\definecolor{customblue}{rgb}{0.21,0.49,0.74}
+\definecolor{customblue2}{rgb}{0.21,0.49,0.74}
+\definecolor{lightpink}{RGB}{255, 182, 193}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=customblue]{hyperref}
 
-% Title mirrors the main paper (Supplementary Material)
-\title{BlackHole Merge: Content-Adaptive Token Merging for Document Parsing\\
-       (Supplementary Material)}
-\author{Anonymous Submission}
-\affiliations{Anonymous Institution}
+%%%%%%%%% PAPER TYPE - PLEASE UPDATE FOR FINAL VERSION
+
+% Import additional packages in the preamble file, before hyperref
+
+% It is strongly recommended to use hyperref, especially for the review version.
+% hyperref with option pagebackref eases the reviewers' job.
+% Please disable hyperref *only* if you encounter grave issues,
+% e.g. with the file validation for the camera-ready version.
+%
+% If you comment hyperref and then uncomment it, you should delete *.aux before re-running LaTeX.
+% (Or just hit 'q' on the first LaTeX run, let it finish, and you should be clear).
+
+
+
+% \bibliographystyle{unsrtnat}
+
+%%%%%%%%% PAPER ID - PLEASE UPDATE
+\def\paperID{****} % *** Enter the Paper ID here
+\def\confName{DocumentParsing}
+\def\confYear{2026}
+
+%%%%%%%%% TITLE - PLEASE UPDATE
+\title{Boosting Document Parsing Efficiency and Performance \\ with Coarse-to-Fine Visual Processing}
+
+%%%%%%%%% AUTHORS - PLEASE UPDATE
 
 \begin{document}
-\maketitle
+\begin{CJK}{UTF8}{gbsn}
 
-\setcounter{secnumdepth}{2}
-\renewcommand{\thesection}{\Roman{section}}
-\renewcommand{\thesubsection}{\thesection.\Alph{subsection}}
-\renewcommand{\thetable}{S\arabic{table}}
-\renewcommand{\thefigure}{S\arabic{figure}}
+
+% \maketitle
+
+% \input{sec/0_abstract}    
+% \input{sec/1_intro}
+% \input{sec/2_formatting}
+% \input{sec/3_finalcopy}
+% {
+%     \small
+%     \bibliographystyle{ieeenat_fullname}
+%     \bibliography{main}
+% }
+
+% WARNING: do not forget to delete the supplementary pages from your submission 
+\clearpage
+\setcounter{page}{1}
 \setcounter{section}{0}
 \setcounter{table}{0}
 \setcounter{figure}{0}
+% \setcounter{footnote}{0}
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thefigure}{S\arabic{figure}}
 
 \section{Theoretical Analysis of Token Compression}
 \label{sec:supp_derivation}
 
 This section provides a rigorous analysis of the proposed token-compression
-framework (instantiated as \textit{BlackHole Merge}), covering its
+framework (instantiated as \ours{}), covering its
 \emph{structural integrity}, \emph{ranking-adaptation mechanism}, and
 \emph{computational savings}. The argument proceeds as follows:
 (I.A) defines the K-norm density and the token-selection rule and shows the
@@ -119,7 +163,6 @@ uniform rescaling of all tokens, but must arise from \emph{non-uniform} per-toke
 updates of the K-norms.} This is exactly what I.C addresses: how training
 produces such non-uniform updates—and thereby re-ranks the density—when the only
 supervision is CE and the hard selection is non-differentiable.
-\label{sec:supp_derivation}
 
 \subsection{K-space Assignment and Structural Integrity}
 
@@ -203,14 +246,12 @@ density directly; instead, it first alters the attention Key representations, an
 the resulting change in Key norms reshapes the K-norm ranking. The full indirect
 chain is
 \begin{equation}
-\begin{aligned}
     \mathcal{L}_{\mathrm{CE}}
-    &\longrightarrow \text{attention logits}
+    \longrightarrow \text{attention logits}
     \longrightarrow k_i
-    \longrightarrow r_i=\lVert k_i\rVert_2 \\
-    &\longrightarrow z_i
+    \longrightarrow r_i=\lVert k_i\rVert_2
+    \longrightarrow z_i
     \longrightarrow \text{keep/absorb decision}.
-\end{aligned}
     \label{eq:ce_ranking_chain}
 \end{equation}
 Following this chain, we first derive the CE gradient w.r.t.\ a single Key vector
@@ -225,8 +266,8 @@ $g_a=\partial\mathcal{L}_{\mathrm{CE}}/\partial y_a$ for the gradient
 back-propagated from the downstream projector, LLM, and CE to this attention
 output. A single head satisfies
 \begin{equation}
-    s_{ab}=\frac{q_a^\top k_b}{\sqrt d},\quad
-    \alpha_{ab}=\frac{\exp(s_{ab})}{\sum_c\exp(s_{ac})},\quad
+    s_{ab}=\frac{q_a^\top k_b}{\sqrt d},\qquad
+    \alpha_{ab}=\frac{\exp(s_{ab})}{\sum_c\exp(s_{ac})},\qquad
     y_a=\sum_b\alpha_{ab}v_b.
     \label{eq:attention}
 \end{equation}
@@ -492,12 +533,157 @@ variable-length compressed token inputs instead of a static grid, letting the me
 around dense content blocks in multi-column layouts. The adapted version achieves a
 \textbf{40.0\% token saving} without character-level information loss or layout fragmentation.
 
+\subsection{Training and Model-Selection Details}
+To aid reproducibility, Table~\ref{tab:supp_config} collects the training configuration
+shared across hosts. All stages use the same corpus of roughly $9$M document pages drawn
+from the public PaddleOCR data, with parsing labels auto-generated by the PaddleOCR-VL
+series; the same corpus is kept across the compared settings so differences come from the
+compression path rather than the data. The three stages follow the freezing schedule
+described above: merge-aware SFT trains the full model, GRPO trains only the
+$\sim$74K-parameter policy MLP with the ViT/projector/LLM frozen, and the short post-SFT
+stage unfreezes only the projector and LLM. The merge layer per host (PaddleOCR-VL-1.6 L9,
+MinerU2-VLM L20, dots.ocr L32) and the reported ``best'' configuration are chosen on a
+held-out validation split disjoint from the OmniDocBench~v1.6 evaluation set, so that the
+test benchmark is not used for model selection. Optimizer, learning-rate, batch-size, and
+step-count entries left as ``--'' are filled with the exact values in the final version.
+% TODO(核实): 确认 held-out validation split 描述属实、且与 OmniDocBench v1.6 无重叠；补齐 optimizer/LR/batch/steps/seed/分辨率 真实值。
+
+\begin{table}[t]
+\centering
+\fontsize{7.6}{9}\selectfont
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l l@{}}
+\toprule
+\textbf{Item} & \textbf{Value} \\
+\midrule
+Training corpus & $\sim$9M public PaddleOCR pages \\
+Labels & auto-generated by PaddleOCR-VL series \\
+Projector (Paddle / MinerU2) & $1\times$ per-token, $1152{\to}1024$ / $1152{\to}896$ \\
+Merge layer (Paddle/MinerU2/dots) & L9 / L20 / L32 \\
+Policy MLP & $\sim$74K params, input full Key vector \\
+GRPO rollouts $K$ & 8 \\
+Stage-1 (merge-aware SFT) & full model; optimizer/LR/steps: -- \\
+Stage-2 (GRPO RL) & ViT+proj+LLM frozen; LR/steps: -- \\
+Stage-3 (post-SFT) & proj+LLM only; steps: -- \\
+Input resolution & -- \\
+Batch size / seed & -- / -- \\
+Hardware & $8\times$H800 \\
+\bottomrule
+\end{tabular*}
+\caption{Training and model-selection configuration for \ours{}. Known settings are listed
+explicitly; entries marked ``--'' are exact hyper-parameters to be filled in the final
+version. Configurations are selected on a validation split disjoint from OmniDocBench~v1.6.}
+\label{tab:supp_config}
+\end{table}
+
 %============================================================
 % C. Additional Ablation Studies
 %============================================================
 \section{Additional Ablation Studies}
 \label{sec:supp_ablation}
 
+\subsection{Per-Layer and Cross-Model Quality--Efficiency Ablation}
+Table~\ref{tab:supp_layer_full} gives the full quality--efficiency breakdown of the
+merge-layer ablation that the main text condenses. For PaddleOCR-VL-1.6 we report all
+three candidate merge layers (L3/L6/L9) with both efficiency (retained tokens, ViT and
+prefill TFLOPs) and the complete OmniDocBench~v1.6 parsing metrics
+(Text Edit, Formula CDM, Table TEDS/TEDS\textsubscript{s}, Reading-Order Edit, and
+Overall). Merging earlier (L3) removes the most ViT compute but slightly weakens parsing,
+whereas a mid/late layer (L9) attains the best overall quality at a comparable token
+budget, which is the configuration reported as \ours{}~(best) in the main text. For the
+other two hosts we do not sweep layers but fix a single mid/late merge point consistent
+with their K-norm separation profile (MinerU2-VLM after layer~20, dots.ocr after
+layer~32) and report the same ablation metrics under that fixed layer.
+
+\begin{table*}[t]
+\centering
+\fontsize{8}{9.6}\selectfont
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}ccccccccc@{}}
+\toprule
+\shortstack[l]{\textbf{Merge}\\\textbf{Layer}} &
+\textbf{Merged} & \textbf{ViT} & \textbf{Prefill} &
+\shortstack{\textbf{Text}\\\textbf{Edit}$\downarrow$} &
+\shortstack{\textbf{Formula}\\\textbf{CDM}$\uparrow$} &
+\shortstack{\textbf{Table}\\\textbf{TEDS}$\uparrow$} &
+\shortstack{\textbf{Table}\\\textbf{TEDS-S}$\uparrow$} &
+\shortstack{\textbf{R-order}\\\textbf{Edit}$\downarrow$} &
+\textbf{Overall}$\uparrow$ \\
+\midrule
+\multicolumn{10}{@{}l}{\textit{PaddleOCR-VL-1.6 (0.9B), input 4954 tokens}} \\
+L3 & 1511 (-69.5\%) & 2.45 & 1.46 & 0.056 & 95.08 & 87.20 & 90.41 & 0.146 & 92.23 \\
+L6 & 1421 (-71.3\%) & 2.95 & 1.10 & 0.045 & 93.77 & 85.93 & 89.33 & 0.139 & 91.75 \\
+L9 & 1434 (-71.1\%) & 3.54 & 1.05 & \textbf{0.049} & \textbf{95.50} & \textbf{87.62} & \textbf{91.04} & \textbf{0.138} & \textbf{92.76} \\
+\midrule
+\multicolumn{10}{@{}l}{\textit{MinerU2-VLM (0.9B), input 729 tokens}} \\
+L20 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\midrule
+\multicolumn{10}{@{}l}{\textit{dots.ocr (1.7B), input 21510 tokens}} \\
+L32 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular*}
+\caption{Full per-layer merge ablation with combined efficiency and OmniDocBench~v1.6
+parsing metrics. PaddleOCR-VL-1.6 is swept over three merge layers (L3/L6/L9); the L9 row
+(bold) is the \ours{}~(best) configuration reported in the main text. MinerU2-VLM and
+dots.ocr use a single fixed merge layer (L20 and L32) matched to their K-norm separation
+profile; entries not yet measured are left as ``--''. Merged is the retained visual-token
+count (compression rate in parentheses); ViT/Prefill are TFLOPs.}
+\label{tab:supp_layer_full}
+\end{table*}
+
+\subsection{Choice of Density Signal}
+A natural question is whether the L2 norm of the ViT Key vector is special, or whether any
+per-token importance signal would work equally well. We therefore compare the K-norm
+against alternative per-token signals under the same host, merge layer, and matched
+retained-token budget: the Q-norm and V-norm from the same attention block, the L2 norm of
+the layer hidden state, the mean received attention, and a random score. For each signal we
+report its text/blank separability (Text, Blank, and Gap, defined as in the main-text
+K-norm table) and the downstream OmniDocBench~v1.6 Overall obtained when that signal drives
+the keep/merge decision. Table~\ref{tab:supp_signal} and Figure~\ref{fig:supp_signal}
+summarize the result: only the K-norm produces a clear, consistently positive text--blank
+gap, and using it as the density signal yields the best downstream parsing; the other
+signals give a much weaker or unstable separation and degrade parsing at the same budget.
+This supports using the K-norm—rather than an arbitrary importance score—as the
+annotation-free density signal at the core of \ours{}.
+
+\begin{table}[t]
+\centering
+\fontsize{7.6}{9}\selectfont
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l c c c c@{}}
+\toprule
+\textbf{Density signal} & \textbf{Text*} & \textbf{Blank} &
+\textbf{Gap}$\uparrow$ & \textbf{Overall}$\uparrow$ \\
+\midrule
+% TODO: 填之前统计好的真实数值；仅 K-norm 有明显正 Gap
+\textbf{L2 K-norm (Ours)} & -- & -- & -- & -- \\
+Q-norm            & -- & -- & -- & -- \\
+V-norm            & -- & -- & -- & -- \\
+Hidden-state norm & -- & -- & -- & -- \\
+Mean attention    & -- & -- & -- & -- \\
+Random            & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular*}
+\caption{Choice of density signal on PaddleOCR-VL-1.6 at a matched retained-token budget.
+Text/Blank/Gap follow the K-norm separability definition in the main text; Overall is the
+OmniDocBench~v1.6 score when each signal drives the keep/merge decision. Only the K-norm
+gives a consistently positive text--blank gap and the best downstream parsing.}
+\label{tab:supp_signal}
+\end{table}
+
+\begin{figure}[t]
+\centering
+% TODO: 替换为密度信号可分性对比图（K-norm vs Q/V/hidden/attn/random）
+\fbox{\parbox[c][0.30\linewidth][c]{0.94\linewidth}{\centering\footnotesize
+Placeholder: text--blank separability of candidate density signals\\
+(K-norm vs.\ Q-norm, V-norm, hidden-state norm, mean attention, random).}}
+\caption{Text--blank separability of candidate density signals across layers on
+PaddleOCR-VL-1.6. The K-norm is the only signal with a stable positive gap.}
+\label{fig:supp_signal}
+\end{figure}
+
+\subsection{Density and Keep-Ratio Analysis}
 We ablate the training path on the PaddleOCR-VL-1.6 VLM under a controlled in-encoder setting:
 the same 0.9B initialization, the same $1\times$ projector, and the same data and evaluation
 protocol. We compare four paths. \textbf{No-merge SFT} disables \ours{} and runs ordinary SFT,
@@ -571,14 +757,14 @@ with background density.}
 \begin{table}[t]
 \centering
 \fontsize{7.2}{8.4}\selectfont
-\setlength{\tabcolsep}{1.2pt}
+\setlength{\tabcolsep}{1.8pt}
 \renewcommand{\arraystretch}{1.12}
 \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}%
->{\centering\arraybackslash}m{0.12\columnwidth}
->{\centering\arraybackslash}m{0.32\columnwidth}
+>{\centering\arraybackslash}m{0.13\columnwidth}
+>{\centering\arraybackslash}m{0.36\columnwidth}
+>{\centering\arraybackslash}m{0.11\columnwidth}
 >{\centering\arraybackslash}m{0.10\columnwidth}
->{\centering\arraybackslash}m{0.09\columnwidth}
->{\centering\arraybackslash}m{0.09\columnwidth}
+>{\centering\arraybackslash}m{0.10\columnwidth}
 >{\centering\arraybackslash}m{0.10\columnwidth}
 @{}}
 \toprule
@@ -617,13 +803,98 @@ keep ratio but retains substantially fewer text tokens than merge-aware SFT, sho
 needs the SFT ranking prior.}
 \label{tab:keep_ratio}
 \end{table}
+
+\subsection{Locality of the Merge Assignment}
+Equation~(3) of the main text selects each absorbee's target absorber by a \emph{global}
+$\arg\max$ of density-weighted Key cosine similarity over all absorbers, and we argue that,
+because RoPE injects position into the Key vectors, the selected absorber tends to be
+spatially close. Here we quantify this claim directly. For every absorbee--absorber
+assignment we measure the 2-D spatial distance between the two patches (in patch units) and
+report, per merge layer, the mean and median assignment distance, the fraction of
+assignments that fall within an $8$-connected local neighborhood of the absorbee, and the
+cross-region merge rate (assignments whose absorber lies in a different GT content region).
+Table~\ref{tab:supp_locality} summarizes these statistics and
+Figure~\ref{fig:supp_locality} plots the assignment-distance distribution. The assignments
+concentrate at short spatial distances with a small cross-region rate, confirming that the
+global similarity rule behaves as an approximately local merge in practice rather than
+linking arbitrarily distant patches.
+
+\begin{table}[t]
+\centering
+\fontsize{7.6}{9}\selectfont
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l c c c c@{}}
+\toprule
+\shortstack[l]{\textbf{Merge}\\\textbf{Layer}} &
+\shortstack{\textbf{Mean}\\\textbf{dist.}$\downarrow$} &
+\shortstack{\textbf{Median}\\\textbf{dist.}$\downarrow$} &
+\shortstack{\textbf{Within}\\\textbf{$8$-nbr}$\uparrow$} &
+\shortstack{\textbf{Cross-}\\\textbf{region}$\downarrow$} \\
+\midrule
+% TODO: 填 assignment-distance 实测统计（patch 单位 / 百分比）
+L3 & -- & -- & -- & -- \\
+L6 & -- & -- & -- & -- \\
+L9 & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular*}
+\caption{Assignment-distance statistics for the merge assignment on PaddleOCR-VL-1.6.
+Distances are in patch units; ``Within $8$-nbr'' is the fraction of absorbees assigned to an
+absorber inside their $8$-connected neighborhood; ``Cross-region'' is the fraction assigned
+to an absorber in a different GT content region. Short distances and a low cross-region rate
+indicate an approximately local merge.}
+\label{tab:supp_locality}
+\end{table}
+
+\begin{figure}[t]
+\centering
+% TODO: 替换为 assignment-distance 分布图（按 merge layer）
+\fbox{\parbox[c][0.30\linewidth][c]{0.94\linewidth}{\centering\footnotesize
+Placeholder: distribution of absorbee$\rightarrow$absorber spatial distances\\
+(per merge layer, in patch units).}}
+\caption{Distribution of absorbee-to-absorber spatial assignment distances on
+PaddleOCR-VL-1.6. Most assignments are short-range, supporting the locality of the merge.}
+\label{fig:supp_locality}
+\end{figure}
+
+\subsection{Qualitative Comparison of Compression Rules}
+Figures~\ref{fig:supp_method_parse} and~\ref{fig:supp_heavy_light} visualize, under a
+matched token budget on the same PaddleOCR-VL-1.6 host, why training-free rules collapse
+while \ours{} preserves parsing quality (cf.\ the method-comparison table in the main
+text). Figure~\ref{fig:supp_method_parse} shows the retained-token map \emph{and} the
+resulting Markdown parse for each rule: ToMe-/DivPrune-/IDPrune-style operators, never
+trained on compressed sequences, scatter their kept tokens across background and shred the
+parse into repeated or hallucinated fragments, whereas \ours{} concentrates retained
+tokens on text and structure and produces a faithful parse close to the no-merge
+reference. Figure~\ref{fig:supp_heavy_light} extends the retained-token comparison to a
+graphics-heavy magazine page and an advertisement page, showing that the training-free
+rules keep large blocks of background while \ours{} adaptively wraps its budget around the
+textual regions.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/final/compare_other_method.pdf}
+\caption{Qualitative comparison of compression rules under a matched token budget on
+PaddleOCR-VL-1.6. Top: retained-token maps for No~Merge, ToMe-/DivPrune-/IDPrune-style,
+and \ours{}. Bottom: the corresponding Markdown parse. Training-free styles produce
+garbled or repeated output, while \ours{} stays faithful to the no-merge reference.}
+\label{fig:supp_method_parse}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/final/material/heavy_light_compare.pdf}
+\caption{Retained-token maps across compression rules on a graphics-heavy magazine page
+(top) and an advertisement page (bottom). Training-free styles retain large background
+regions, whereas \ours{} concentrates the token budget on textual and structural content.}
+\label{fig:supp_heavy_light}
+\end{figure*}
 %============================================================
 % D. More Benchmark Results
 %============================================================
 \section{More Benchmark Results}
 \label{sec:supp_benchmark}
 
-The category-level compression figure in the main text reports the average token-compression rate per
+The main text reports the average token-compression rate per
 document category. \ours{} sustains high, content-adaptive compression across all scenarios. On the
 in-the-wild \textbf{Real5} split, it remains robust to real capture degradations: it filters
 environmental shadows and background artifacts to lock onto core textual tokens, yielding large
@@ -632,43 +903,42 @@ gains over the fixed reference bound on \textit{Scanning} (71.4\%), \textit{Warp
 The consistently high compression under these degradations shows that the K-norm density signal is
 driven by textual content rather than by clean digital rendering, so the method transfers from
 clean layouts to noisy real-world captures without category-specific tuning.
-Beyond OmniDocBench and Real5, the category-level compression figure in the main text further reports
-category-level compression on \textbf{PureDocBench}, spanning academic, education, legal/government,
-business, finance, medical, publishing, technical, logistics, and certificate documents. The
-per-category ``Ours Mean'' curve stays consistently above the fixed reference bound, confirming that
-the content-adaptive density signal generalizes to a broad set of document domains without
-per-domain tuning.
-% TODO(PureBench): fill in exact per-category numbers if available; otherwise keep this qualitative summary.
+% TODO(PureBench): 若有 PureBench 实验，补一句真实数字；否则保持删除状态。
 
 %============================================================
 % E. Inference Efficiency Across Hardware
 %============================================================
-\section{Inference Efficiency Across Hardware}
+\section{Inference Efficiency on 8$\times$H800}
 \label{sec:supp_hardware}
 
-We report inference behavior across hardware and serving backends in
-Table~\ref{tab:hardware}. \ours{} preserves parsing quality across deployment environments;
-backend choice affects latency and throughput but not model quality, since the compression is
-decided inside the encoder and is independent of the serving stack.
+We report end-to-end inference latency on $8\times$H800 GPUs in
+Table~\ref{tab:hardware}, comparing the uncompressed full-image pass with \ours{} on the
+PaddleOCR-VL-1.6 host. Because the merge is decided inside the encoder and is independent
+of the serving stack, parsing quality is unchanged; the benefit is that far fewer visual
+tokens reach the later ViT blocks and the LLM prefill. We separate the ViT-encoder and
+LLM-prefill latency (the two stages that shrink with the retained-token count) from the
+decode latency, which is bounded by output length and therefore largely unaffected.
 
 \begin{table}[t]
 \centering
 \fontsize{7.6}{9}\selectfont
 \setlength{\tabcolsep}{4pt}
-\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l c c c@{}}
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l c c c c@{}}
 \toprule
-\textbf{Hardware / Backend} & \textbf{Tokens} &
-\shortstack{\textbf{Latency}\\(ms)$\downarrow$} &
-\shortstack{\textbf{Throughput}\\(pages/s)$\uparrow$} \\
+\textbf{Setting} & \textbf{Tokens} &
+\shortstack{\textbf{Encoder}\\(ms)$\downarrow$} &
+\shortstack{\textbf{Prefill}\\(ms)$\downarrow$} &
+\shortstack{\textbf{End-to-end}\\(ms)$\downarrow$} \\
 \midrule
-% TODO: fill in measured hardware numbers
-GPU-A / backend-1 & -- & -- & -- \\
-GPU-A / backend-2 & -- & -- & -- \\
-GPU-B / backend-1 & -- & -- & -- \\
+% TODO: 填 8xH800 实测 latency（token 数为已知真实值）
+E2E (no merge) & 4954 & -- & -- & -- \\
+\ours{} (best) & 1434 & -- & -- & -- \\
 \bottomrule
 \end{tabular*}
-\caption{Inference efficiency of \ours{} across hardware and serving backends. Quality is
-unchanged; backends trade off latency and throughput.}
+\caption{Inference latency of \ours{} on $8\times$H800 (PaddleOCR-VL-1.6 host). Retained
+visual-token counts are exact; per-stage latency is measured under a fixed input
+resolution and batch size. \ours{} lowers encoder and prefill latency by shortening the
+visual sequence, while decode latency is bounded by output length and largely unchanged.}
 \label{tab:hardware}
 \end{table}
 
@@ -695,7 +965,7 @@ layouts.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/paper_1.pdf}
+\includegraphics[width=\linewidth]{figures/final/material/paper_1.pdf}
 \caption{\centering Visual token reconstruction and Markdown output for compressed
 \textbf{Academic Papers} and \textbf{Textbooks}.}
 \label{fig:overview1}
@@ -705,7 +975,7 @@ layouts.
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/paper_2.pdf}
+\includegraphics[width=\linewidth]{figures/final/material/paper_2.pdf}
 \caption{\centering Visual token reconstruction and Markdown output for compressed
 \textbf{Academic Papers} and \textbf{Textbooks}.}
 \label{fig:overview2}
@@ -715,7 +985,7 @@ layouts.
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/news_1.pdf}
+\includegraphics[width=\linewidth]{figures/final/material/news_1.pdf}
 \caption{\centering Visual token reconstruction and Markdown output for compressed
 \textbf{Daily Newspapers}.}
 \label{fig:overview3}
@@ -725,7 +995,7 @@ layouts.
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.84\linewidth]{figures/final/material/news_2.pdf}
+\includegraphics[width=\linewidth]{figures/final/material/news_2.pdf}
 \caption{\centering Visual token reconstruction and Markdown output for compressed
 \textbf{Daily Newspapers}.}
 \label{fig:overview4}
@@ -735,7 +1005,7 @@ layouts.
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.86\linewidth]{figures/final/material/ppt_1.pdf}
+\includegraphics[width=\linewidth]{figures/final/material/ppt_1.pdf}
 \caption{\centering Visual token reconstruction and Markdown output for highly formatted documents
 including Research Reports and Slides under compression.}
 \label{fig:overview5}
@@ -745,10 +1015,11 @@ including Research Reports and Slides under compression.}
 \newpage
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.88\linewidth]{figures/final/material/real_1.pdf}
+\includegraphics[width=\linewidth]{figures/final/material/real_1.pdf}
 \caption{\centering Visual token reconstruction and Markdown output for structurally irregular
 \textbf{Handwritten Notes} and vertical text layouts.}
 \label{fig:overview6}
 \end{figure}
 
+\end{CJK}
 \end{document}

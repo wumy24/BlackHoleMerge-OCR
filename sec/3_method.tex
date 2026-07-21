@@ -42,7 +42,7 @@ with attention weights $\mathrm{softmax}(QK^\top/\sqrt{d_k})$. Since Key vectors
         MinerU2-VLM      & 26 & 14--25& 20 / 0.57 \\
         \bottomrule
     \end{tabular*}
-    \caption{K-norm separation between text and background regions across OCR/document VLMs on 1{,}000 documents. Gap $=(\operatorname{mean}(K_{\text{text}})-\operatorname{mean}(K_{\text{blank}}))/\operatorname{std}(K_{\text{all}})$. Span is the longest continuous interval with positive average Gap; Best is the layer with the maximum average Gap.}
+    \caption{K-norm separation between text and background regions across OCR/document VLMs on 1{,}000 documents. Text tokens are patches falling inside GT content bounding boxes (used as an approximate valid-content mask, not a pixel-perfect one), while blank tokens are patches outside any box; this coarse split still reflects the overall density trend. Gap $=(\operatorname{mean}(K_{\text{text}})-\operatorname{mean}(K_{\text{blank}}))/\operatorname{std}(K_{\text{all}})$. Span is the longest continuous interval with positive average Gap; Best is the layer with the maximum average Gap.}
     \label{tab:cross_model_knorm}
 \end{table}
 
@@ -70,7 +70,7 @@ To visualize the merging behavior, we count absorbees per spatial location and n
 
 \begin{figure}[!tb]
 \centering
-\includegraphics[width=1\linewidth]{figures/final/absorbtion_all.pdf}
+\includegraphics[width=0.7\linewidth]{figures/final/absorbtion_all.pdf}
 \caption{Token absorption heatmap of \ours{}. Colors denote the normalized number of absorbees per retained token. Most absorptions occur at text boundaries and text-background interfaces.}
 \label{fig:absorb_all}
 \end{figure}
@@ -142,9 +142,9 @@ At inference, we use the SFT-adapted merge layer together with the GRPO-trained 
 
 Under the VLM-only setting of PaddleOCR-VL-1.6, Fig.~\ref{fig:overview} visualizes representative merge layers on two cases (world at layer~9 and duck at layer~6). Both show content-adaptive compression: text-heavy regions retain more tokens, background and redundant regions are merged more aggressively, and key text regions are consistently preserved, indicating that BlackHoleMerge stably retains OCR-relevant information across layout patterns.
 
-\begin{figure*}[!t]
+\begin{figure}[!t]
 \centering
-\includegraphics[width=1\linewidth]{figures/final/world_duck.pdf}
+\includegraphics[width=\linewidth]{figures/final/world_duck.pdf}
 \caption{Changes in \ours{}'s compression decisions from merge-aware SFT to RL post-training. Left: world case (layer~9); right: duck case (layer~6).}
 \label{fig:overview}
-\end{figure*}
+\end{figure}
