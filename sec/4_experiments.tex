@@ -127,16 +127,16 @@ BHM-L32                 & 21510 & -- & -- & -- \\
 \multicolumn{5}{@{}l}{\textit{PaddleOCR-VL-1.6 (0.9B)}} \\
 Pipeline$^\dagger$   & 4954 & 1202 (-75.7\%) & 6.87 & 0.84 \\
 E2E (no merge)       & 4954 & 4954 (0.0\%)   & 7.13 & 6.17 \\
-Post-SFT      & 4954 & 1434 (-71.1\%) & 3.54 & 1.05 \\
+Ours(best)      & 4954 & 1434 (-71.1\%) & 3.54 & 1.05 \\
 \midrule
 \multicolumn{5}{@{}l}{\textit{MinerU2-VLM (0.9B)}} \\
 Pipeline$^\dagger$   & 10604 & 10604 (0.0\%) & 12.57 & 8.25 \\
 E2E (no merge)       & 729   & 729 (0.0\%)   & 0.67  & 0.57 \\
-Post-SFT      & 729   & ? & -- & -- \\
+Ours(best)      & 729   & ? & -- & -- \\
 \midrule
 \multicolumn{5}{@{}l}{\textit{dots.ocr (1.7B)}} \\
 E2E VLM$^\dagger$    & 21510 & 5377 (-75.0\%) & 211.36 & 21.67 \\
-Post-SFT      & 21510 & -- & -- & -- \\
+Ours(best)      & 21510 & -- & -- & -- \\
 \bottomrule
 \end{tabular*}
 \caption{Efficiency on OmniDocBench v1.6: input vs.\ retained (merged) visual tokens and VLM ViT/prefill TFLOPs. $^\dagger$ official implementation; Pipeline uses external crop with $4\times$ down-sampling or resize, E2E runs a single full-image pass, and Post-SFTreports our best merge configuration per host. Parsing quality for the same settings is in Table~\ref{tab:omnidocbench_compare}.}
