@@ -24,9 +24,9 @@ We use three settings. (i) Public end-to-end parsing systems, to place the compr
 \fontsize{8}{9.6}\selectfont
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.15}
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l l cccccc@{}}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l l c c c c cccccc@{}}
 \toprule
-\textbf{Host} & \textbf{Training configuration} &
+\textbf{Host} & \textbf{Training configuration} & \textbf{Input} & \textbf{Merged} & \textbf{ViT} & \textbf{Prefill} &
 \shortstack{\textbf{Text}\\\textbf{Edit}$\downarrow$} &
 \shortstack{\textbf{Formula}\\\textbf{CDM}$\uparrow$} &
 \shortstack{\textbf{Table}\\\textbf{TEDS}$\uparrow$} &
@@ -35,31 +35,31 @@ We use three settings. (i) Public end-to-end parsing systems, to place the compr
 \textbf{Overall}$\uparrow$ \\
 \midrule
 \multirow[c]{9}{*}{\shortstack[l]{PaddleOCR\\-VL-1.6}}
-& (1) Official$^\dagger$                & 0.033 & 97.49 & 94.76 & 97.11 & 0.127 & 96.33 \\
-& (2) No-merge SFT (baseline)           & 0.045 & 94.00 & 88.32 & 91.31 & 0.141 & 92.61 \\
-& \quad $+$ DivPrune-style$^\ddagger$   & 0.990 & 0.48 & 0.00 & 0.00 & 0.768 & 0.32 \\
-& \quad $+$ IDPrune-style$^\ddagger$    & 0.996 & 0.00 & 0.00 & 0.00 & 0.805 & 0.13 \\
-& \quad $+$ ToMe-style$^\ddagger$       & 0.683 & 0.00 & 0.81 & 12.83 & 0.566 & 15.50 \\
-& (3) No-merge SFT $+$ RL               & 0.069 & 91.77 & 78.70 & 83.12 & 0.165 & 87.87 \\
-& (4) Merge-aware SFT                    & 0.063 & 93.66 & 87.93 & 91.30 & 0.154 & 91.77 \\
-& (5) Merge-aware SFT $+$ RL             & 0.049 & 94.65 & 78.68 & 82.77 & 0.145 & 89.48 \\
-& (6) Post-SFT                    & \textbf{0.049} & \textbf{95.50} & \textbf{87.62} & \textbf{91.04} & \textbf{0.138} & \textbf{92.76} \\
-\cmidrule(lr){1-8}
+& (1) Official(pipeline)$^\dagger$                & 4954 & 1202 & 6.87 & 0.84 & 0.033 & 97.49 & 94.76 & 97.11 & 0.127 & 96.33 \\
+& (2) No-merge SFT (baseline)           & 4954 & 4954 & 7.13 & 6.17 & 0.045 & 94.00 & 88.32 & 91.31 & 0.141 & 92.61 \\
+& \quad $+$ DivPrune-style$^\ddagger$   & 4954 & 1434 & 7.13 & 1.03 & 0.990 & 0.48 & 0.00 & 0.00 & 0.768 & 0.32 \\
+& \quad $+$ IDPrune-style$^\ddagger$    & 4954 & 1434 & 7.13 & 1.03 & 0.996 & 0.00 & 0.00 & 0.00 & 0.805 & 0.13 \\
+& \quad $+$ ToMe-style$^\ddagger$       & 4954 & 1434 & 5.06 & 1.03 & 0.683 & 0.00 & 0.81 & 12.83 & 0.566 & 15.50 \\
+& (3) No-merge SFT $+$ RL               & 4954 & 2029   & 4.06 & 1.75 & 0.069 & 91.77 & 78.70 & 83.12 & 0.165 & 87.87 \\
+& (4) Merge-aware SFT                    & 4954 & 2428   & 4.36 & 2.11 & 0.063 & 93.66 & 87.93 & 91.30 & 0.154 & 91.77 \\
+& (5) Merge-aware SFT $+$ RL             & 4954 & 1434   & 3.54 & 1.05 & 0.049 & 94.65 & 78.68 & 82.77 & 0.145 & 89.48 \\
+& (6) Post-SFT                    & 4954 & 1434 & 3.54 & 1.05 & \textbf{0.049} & \textbf{95.50} & \textbf{87.62} & \textbf{91.04} & \textbf{0.138} & \textbf{92.76} \\
+\cmidrule(lr){1-12}
 \multirow[c]{6}{*}{\shortstack[l]{MinerU2\\-VLM}}
-& (1) Official$^\dagger$                & 0.102* & 82.42 & 81.38 & 84.88 & 0.198 & 84.54 \\
-& (2) No-merge SFT (baseline)           & -- & -- & -- & -- & -- & -- \\
-& (3) No-merge SFT $+$ RL               & -- & -- & -- & -- & -- & -- \\
-& (4) Merge-aware SFT                    & -- & -- & -- & -- & -- & -- \\
-& (5) Merge-aware SFT $+$ RL             & -- & -- & -- & -- & -- & -- \\
-& (6) Post-SFT                    & -- & -- & -- & -- & -- & -- \\
-\cmidrule(lr){1-8}
+& (1) Official(pipeline)$^\dagger$                & 10604 & 10604 & 12.57 & 8.25 & 0.102* & 82.42 & 81.38 & 84.88 & 0.198 & 84.54 \\
+& (2) No-merge SFT (baseline)           & 14580   & 14580   & 12.32  & 28.72 & 0.117 & 83.26 & 82.17 & 86.66 & 0.182 & 84.58 \\
+& (3) No-merge SFT $+$ RL               & 14580   & 7294    & 11.03    & 9.80   & 0.112 & 80.01 & 78.44 & 81.25 & 0.190 & 82.42 \\
+& (4) Merge-aware SFT                    & 14580   & 6815    & 10.95    & 8.87   & 0.104 & 83.15 & 77.90 & 81.97 & 0.189 & 83.55 \\
+& (5) Merge-aware SFT $+$ RL             & 14580   & 3937    & 10.48    & 4.15   & 0.098 & 84.27 & 76.18 & 77.48 & 0.189 & 83.55 \\
+& (6) Post-SFT                    & 14580   & 3937     & 10.48    & 4.15   & 0.099 & 84.27 & 80.25 & 85.28 & 0.186 & 84.87 \\
+\cmidrule(lr){1-12}
 \multirow[c]{6}{*}{\shortstack[l]{dots.ocr}}
-& (1) Official$^\dagger$                & 0.054* & 90.88 & 86.51 & 89.98 & 0.139 & 90.68 \\
-& (2) No-merge SFT (baseline)           & -- & -- & -- & -- & -- & -- \\
-& (3) No-merge SFT $+$ RL               & -- & -- & -- & -- & -- & -- \\
-& (4) Merge-aware SFT                    & -- & -- & -- & -- & -- & -- \\
-& (5) Merge-aware SFT $+$ RL             & -- & -- & -- & -- & -- & -- \\
-& (6) Post-SFT                    & -- & -- & -- & -- & -- & -- \\
+& (1) Official(vlm)$^\dagger$                & 21510 & 5377 & 211.36 & 21.67 & 0.054* & 90.88 & 86.51 & 89.98 & 0.139 & 90.68 \\
+& (2) No-merge SFT (baseline)           & 3934 & 3934 & -- & -- & 0.101  & 94.51 & 87.04 & 89.92 & 0.190 & 91.44 \\
+& (3) No-merge SFT $+$ RL               & -- & -- & -- & -- & --     & --    & --    & --    & --    & -- \\
+& (4) Merge-aware SFT                    & -- & -- & -- & -- & 0.111 & 93.06 & 86.99 & 89.29 & 0.193 & 90.41 \\
+& (5) Merge-aware SFT $+$ RL             & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+& (6) Post-SFT                    & 21510 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular*}
 \caption{Per-stage training progression and training-free baselines on OmniDocBench v1.6, with the same six-stage progression per host. (1) Official is each host's released implementation; (2) No-merge SFT is the true baseline fine-tuned on our data with no compression (isolating the data effect); (3) applies RL without a merge-aware SFT prior and collapses; (4)--(6) add \ours{} and its RL/post-SFT stages, with (6) Post-SFTthe reported configuration. $^\ddagger$ On PaddleOCR-VL-1.6 we additionally attach training-free compression operators (DivPrune-/IDPrune-/ToMe-style) to the \emph{same} no-merge SFT backbone~(2) at a matched retained-token budget; they collapse because that backbone was never exposed to compressed sequences, whereas \ours{} adapts the backbone to the compression path. $^\dagger$ official implementation; $*$ reproduced by us. Efficiency for these settings is in Table~\ref{tab:efficiency}.}

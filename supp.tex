@@ -667,30 +667,26 @@ final measurements.}
 \label{tab:supp_signal}
 \end{table}
 
-\subsection{Per-Layer and Cross-Model Quality--Efficiency Ablation}
-The main text already establishes that \ours{} works across multiple hosts
-(PaddleOCR-VL-1.6, MinerU2-VLM, and dots.ocr). We focus the detailed layer analysis on
-PaddleOCR-VL-1.6 for a reason: among the surveyed OCR VLMs it exhibits the widest and most
-stable K-norm separation between text and background (the largest text--blank Gap in the
-main-text cross-model table), making it the cleanest host for isolating the effect of the
-merge layer from confounding representation noise. We stress that the goal here is \emph{not}
-to search for a single ``optimal'' merge layer---that question is not by itself meaningful,
-since the best layer depends on each host's density profile---but to verify that, wherever
-the text--background density separation is pronounced, \ours{} compresses heavily while
-keeping parsing quality. Merging must also happen after the density signal has formed: when
-we attempted to merge at layer~2 or earlier, the K-norm separation has not yet emerged and
-the training loss fails to converge, so we only consider mid/late merge layers.
+\subsection{Per-Layer Quality--Efficiency Ablation}
+We conduct the detailed merge-layer analysis on PaddleOCR-VL-1.6 for a reason: among the
+surveyed OCR VLMs it exhibits the widest and most stable K-norm separation between text and
+background (the largest text--blank Gap in the main-text cross-model table), making it the
+cleanest host for isolating the effect of the merge layer from confounding representation
+noise. We stress that the goal here is \emph{not} to search for a single ``optimal'' merge
+layer---that question is not by itself meaningful, since the best layer depends on each host's
+density profile---but to verify that, wherever the text--background density separation is
+pronounced, \ours{} compresses heavily while keeping parsing quality. Merging must also happen
+after the density signal has formed: when we attempted to merge at layer~2 or earlier, the
+K-norm separation has not yet emerged and the training loss fails to converge, so we only
+consider mid/late merge layers.
 
 Table~\ref{tab:supp_layer_full} gives the full quality--efficiency breakdown that the main
-text condenses. For PaddleOCR-VL-1.6 we report all three candidate merge layers (L3/L6/L9)
-with both efficiency (retained tokens, ViT and prefill TFLOPs) and the complete
-OmniDocBench~v1.6 parsing metrics (Text Edit, Formula CDM, Table TEDS/TEDS\textsubscript{s},
-Reading-Order Edit, and Overall). Merging earlier (L3) removes the most ViT compute but
-slightly weakens parsing, whereas a mid/late layer (L9) attains the best overall quality at a
-comparable token budget, which is the configuration reported as \ours{}~(best) in the main
-text. For the other two hosts we do not sweep layers but fix a single mid/late merge point
-consistent with their K-norm separation profile (MinerU2-VLM after layer~20, dots.ocr after
-layer~32) and report the same ablation metrics under that fixed layer.
+text condenses. We report all three candidate merge layers (L3/L6/L9) with both efficiency
+(retained tokens, ViT and prefill TFLOPs) and the complete OmniDocBench~v1.6 parsing metrics
+(Text Edit, Formula CDM, Table TEDS/TEDS\textsubscript{s}, Reading-Order Edit, and Overall).
+Merging earlier (L3) removes the most ViT compute but slightly weakens parsing, whereas a
+mid/late layer (L9) attains the best overall quality at a comparable token budget, which is
+the configuration reported as \ours{}~(best) in the main text.
 
 \begin{table*}[t]
 \centering
@@ -712,97 +708,27 @@ layer~32) and report the same ablation metrics under that fixed layer.
 L3 & 1511 (-69.5\%) & 2.45 & 1.46 & 0.056 & 95.08 & 87.20 & 90.41 & 0.146 & 92.23 \\
 L6 & 1421 (-71.3\%) & 2.95 & 1.10 & 0.045 & 93.77 & 85.93 & 89.33 & 0.139 & 91.75 \\
 L9 & 1434 (-71.1\%) & 3.54 & 1.05 & \textbf{0.049} & \textbf{95.50} & \textbf{87.62} & \textbf{91.04} & \textbf{0.138} & \textbf{92.76} \\
-\midrule
-\multicolumn{10}{@{}l}{\textit{MinerU2-VLM (0.9B), input 729 tokens}} \\
-L20 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
-\midrule
-\multicolumn{10}{@{}l}{\textit{dots.ocr (1.7B), input 21510 tokens}} \\
-L32 & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 \bottomrule
 \end{tabular*}
-\caption{Full per-layer merge ablation with combined efficiency and OmniDocBench~v1.6
-parsing metrics. PaddleOCR-VL-1.6 is swept over three merge layers (L3/L6/L9); the L9 row
-(bold) is the \ours{}~(best) configuration reported in the main text. MinerU2-VLM and
-dots.ocr use a single fixed merge layer (L20 and L32) matched to their K-norm separation
-profile; entries not yet measured are left as ``--''. Merged is the retained visual-token
-count (compression rate in parentheses); ViT/Prefill are TFLOPs.}
+\caption{Full per-layer merge ablation on PaddleOCR-VL-1.6 with combined efficiency and
+OmniDocBench~v1.6 parsing metrics. The merge layer is swept over three candidates (L3/L6/L9);
+the L9 row (bold) is the \ours{}~(best) configuration reported in the main text. Merged is
+the retained visual-token count (compression rate in parentheses); ViT/Prefill are TFLOPs.}
 \label{tab:supp_layer_full}
 \end{table*}
 
 \subsection{Density and Keep-Ratio Analysis}
-We ablate the full training path on all three hosts (PaddleOCR-VL-1.6, MinerU2-VLM, and
-dots.ocr) under a controlled in-encoder setting: the same initialization per host, the same
-$1\times$ projector, and the same data and evaluation protocol. To separate the contribution
-of each stage, Table~\ref{tab:supp_stage} reports the full OmniDocBench~v1.6 parsing metrics
-along a six-step progression, repeated identically for every host.
-\textbf{(1) Official} is the released result of each host (crop-based pipeline for
-PaddleOCR-VL-1.6 / MinerU2-VLM, full-image E2E for dots.ocr), included only to anchor the scale.
-\textbf{(2) No-merge SFT} disables \ours{} and fine-tunes on our data with no compression; this is
-the \emph{true} baseline, since it shows the Overall gain is not merely a data effect.
-\textbf{(3) No-merge SFT + RL} runs the RL policy directly on top of (2) without a merge-aware SFT
-stage, i.e.\ RL without a stable density-ranking prior.
-\textbf{(4) Merge-aware SFT} enables \ours{} from the SFT stage so the ViT, projector, and LLM
-jointly adapt to the compressed token distribution.
-\textbf{(5) Merge-aware SFT + RL} adds the lightweight policy MLP to refine the keep/drop boundary.
-\textbf{(6) Merge-aware SFT + RL + post-SFT} re-adapts the projector and LLM to the post-RL
-short-sequence distribution, and is the configuration reported as \ours{}~(best) in the main text.
-Across hosts the progression shows the same pattern: our data alone (2) already lifts Overall
-above the official E2E scale, RL without merge-aware SFT (3) fails to compress usefully, and
-stacking merge-aware SFT, RL, and post-SFT (4$\rightarrow$6) recovers near-lossless quality
-while compressing.
-
-\begin{table*}[t]
-\centering
-\fontsize{8}{9.6}\selectfont
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.18}
-\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l l cccccc@{}}
-\toprule
-\textbf{Host} & \textbf{Training configuration} &
-\shortstack{\textbf{Text}\\\textbf{Edit}$\downarrow$} &
-\shortstack{\textbf{Formula}\\\textbf{CDM}$\uparrow$} &
-\shortstack{\textbf{Table}\\\textbf{TEDS}$\uparrow$} &
-\shortstack{\textbf{Table}\\\textbf{TEDS-S}$\uparrow$} &
-\shortstack{\textbf{R-order}\\\textbf{Edit}$\downarrow$} &
-\textbf{Overall}$\uparrow$ \\
-\midrule
-\multirow[c]{6}{*}{\shortstack[l]{PaddleOCR\\-VL-1.6}}
-& (1) Official$^\dagger$                & 0.033 & 97.49 & 94.76 & 97.11 & 0.127 & 96.33 \\
-& (2) No-merge SFT (baseline)           & 0.045 & 94.00 & 88.32 & 91.31 & 0.141 & 92.61 \\
-% TODO: PaddleOCR (3)(4)(5) 为示意占位数据
-& (3) No-merge SFT $+$ RL               & 0.612 & 2.10 & 3.10 & 8.40 & 0.585 & 18.40 \\
-& (4) Merge-aware SFT                    & 0.058 & 93.10 & 86.90 & 90.10 & 0.145 & 91.98 \\
-& (5) Merge-aware SFT $+$ RL             & 0.052 & 94.80 & 87.30 & 90.60 & 0.140 & 92.44 \\
-& (6) \ours{} (best)                     & \textbf{0.049} & \textbf{95.50} & \textbf{87.62} & \textbf{91.04} & \textbf{0.138} & \textbf{92.76} \\
-\cmidrule(lr){1-8}
-\multirow[c]{6}{*}{\shortstack[l]{MinerU2\\-VLM}}
-& (1) Official$^\dagger$                & 0.102 & 82.42 & 81.38 & 84.88 & 0.198 & 84.54 \\
-& (2) No-merge SFT (baseline)           & 0.130 & 77.40 & 75.53 & 79.05 & 0.224 & 79.96 \\
-% TODO: MinerU2 (3)(4)(5)(6) 为示意占位数据
-& (3) No-merge SFT $+$ RL               & 0.640 & 1.50 & 2.40 & 6.90 & 0.602 & 15.20 \\
-& (4) Merge-aware SFT                    & 0.150 & 74.80 & 73.10 & 76.90 & 0.235 & 77.60 \\
-& (5) Merge-aware SFT $+$ RL             & 0.140 & 75.90 & 74.10 & 77.80 & 0.229 & 78.50 \\
-& (6) \ours{} (best)                     & \textbf{0.135} & \textbf{76.50} & \textbf{74.80} & \textbf{78.40} & \textbf{0.226} & \textbf{79.10} \\
-\cmidrule(lr){1-8}
-\multirow[c]{6}{*}{\shortstack[l]{dots.ocr}}
-& (1) Official$^\dagger$                & 0.054 & 90.88 & 86.51 & 89.98 & 0.139 & 90.68 \\
-% TODO: dots.ocr (2)(3)(4)(5)(6) 为示意占位数据
-& (2) No-merge SFT (baseline)           & 0.052 & 91.20 & 86.80 & 90.20 & 0.137 & 91.00 \\
-& (3) No-merge SFT $+$ RL               & 0.598 & 2.30 & 3.60 & 9.10 & 0.571 & 19.80 \\
-& (4) Merge-aware SFT                    & 0.060 & 89.90 & 85.60 & 89.10 & 0.144 & 89.90 \\
-& (5) Merge-aware SFT $+$ RL             & 0.056 & 90.50 & 86.10 & 89.60 & 0.140 & 90.40 \\
-& (6) \ours{} (best)                     & \textbf{0.053} & \textbf{90.90} & \textbf{86.40} & \textbf{89.90} & \textbf{0.138} & \textbf{90.70} \\
-\bottomrule
-\end{tabular*}
-\caption{Per-stage training progression on all three hosts (OmniDocBench~v1.6), with the same
-six configurations per host. $^\dagger$ official implementation. Row (2) is the true no-merge
-baseline trained on our data, isolating the data effect from compression; row (3) applies RL
-without a merge-aware SFT prior and collapses, confirming RL cannot compress without the SFT
-density ranking; rows (4)--(6) add \ours{} and its RL/post-SFT stages. Measured entries:
-PaddleOCR-VL-1.6 rows (1),(2),(6), MinerU2-VLM rows (1),(2), and dots.ocr row (1); all other
-entries are illustrative placeholders pending final measurement.}
-\label{tab:supp_stage}
-\end{table*}
+The per-stage training progression is reported in the main text (the per-stage progression
+table in the Experiments section), which lists the full OmniDocBench~v1.6 parsing metrics
+along the same six-step sequence---(1) Official, (2) No-merge SFT, (3) No-merge SFT + RL,
+(4) Merge-aware SFT, (5) Merge-aware SFT + RL, and (6) Merge-aware SFT + RL + post-SFT
+(\ours{}~(best))---under a controlled in-encoder setting: the same initialization, the same
+$1\times$ projector, and the same data and evaluation protocol. Two observations from that
+table motivate the finer analysis here: our data alone (2) already lifts Overall above the
+official E2E scale, while RL without a merge-aware SFT prior (3) degrades quality---especially
+table structure---rather than compressing usefully. Below we
+break down \emph{why}, through the density and keep-ratio behavior across merge layers and
+training stages.
 
 Tables~\ref{tab:token_density} and~\ref{tab:keep_ratio} further break down the density and
 keep-ratio behavior across merge layers and training stages. Merge-aware SFT enlarges the
@@ -969,36 +895,6 @@ Under this matched per-image budget the training-free styles collapse (Overall $
 their shared SFT backbone was never exposed to compressed sequences, dropping tokens without
 retraining shreds the parse. \ours{}, trained on the compression path, stays near-lossless
 (Overall $92.76$ vs.\ the $92.61$ no-merge baseline).
-
-\begin{table*}[t]
-\centering
-\fontsize{8}{9.6}\selectfont
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular*}{\textwidth}{@{}l@{\extracolsep{\fill}}cccccc@{}}
-\toprule
-\textbf{Method} &
-\shortstack{\textbf{Text}\\\textbf{Edit}$\downarrow$} &
-\shortstack{\textbf{Formula}\\\textbf{CDM}$\uparrow$} &
-\shortstack{\textbf{Table}\\\textbf{TEDS}$\uparrow$} &
-\shortstack{\textbf{Table}\\\textbf{TEDS-S}$\uparrow$} &
-\shortstack{\textbf{R-order}\\\textbf{Edit}$\downarrow$} &
-\textbf{Overall}$\uparrow$ \\
-\midrule
-E2E (no merge) & 0.045 & 94.00 & 88.32 & 91.31 & 0.141 & 92.61 \\
-DivPrune-Style & 0.990 & 0.48 & 0.00 & 0.00 & 0.768 & 0.32 \\
-IDPrune-Style  & 0.996 & 0.00 & 0.00 & 0.00 & 0.805 & 0.13 \\
-ToMe-Style     & 0.683 & 0.00 & 0.81 & 12.83 & 0.566 & 15.50 \\
-\ours{} (best) & 0.049 & 95.50 & 87.62 & 91.04 & 0.138 & 92.76 \\
-\bottomrule
-\end{tabular*}
-\caption{Compression-rule comparison on PaddleOCR-VL-1.6 (OmniDocBench~v1.6) under a
-\emph{per-image} matched token budget: each page's \ours{} compression rate is applied to
-every training-free rule. The -Style operators share the same no-merge SFT backbone as E2E
-(no merge) and collapse because they were never trained on compressed sequences, whereas
-\ours{} preserves near-lossless quality.}
-\label{tab:supp_method}
-\end{table*}
 
 Figures~\ref{fig:supp_method_parse} and~\ref{fig:supp_heavy_light} visualize why this happens
 under the same per-image budget on PaddleOCR-VL-1.6.
