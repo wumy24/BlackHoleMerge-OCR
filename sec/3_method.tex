@@ -87,13 +87,6 @@ h_{a^*}\leftarrow h_{a^*}+\mathrm{sg}(d_j)\cdot(h_j-h_{a^*}).
 \end{equation}
 Here $\mathrm{sg}(d_j)$ controls only the forward merging strength, so gradients update the ViT hidden states and Key representations, which in turn reshape the density ranking in later passes. However, this effect is coarse: once the main text regions are separated, optimization saturates and the boundary stays uncertain. As shown in Fig.~\ref{fig:sft_rl}, SFT reduces visual tokens and aligns density with OCR utility, yet the histogram remains scattered with many tokens in the $0.3$--$0.6$ gray zone, motivating RL for finer refinement.
 
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\linewidth]{figures/final/real_sft_rl.pdf}
-\caption{Density evolution across training stages on the same sample. Left: after merge-aware SFT the page is compressed to 630 tokens, but the density histogram is still scattered with many tokens in the $0.3$--$0.6$ gray zone, so the keep/merge boundary remains uncertain. Right: with the backbone frozen, the lightweight RL policy further compresses to 367 tokens and polarizes the histogram into a clearer V-shape, shrinking the mid-density region around $0.5$.}
-\label{fig:sft_rl}
-\end{figure}
-
 \subsubsection{Lightweight RL Policy.}
 In the second stage we freeze the ViT, projector, and LLM, and train only a lightweight policy MLP ($\sim$74K parameters) that refines the keep/drop boundary on top of the SFT density ordering. Here a ``dropped'' token is not deleted but reassigned to the absorbee side and merged into its absorber as in Eq.~(\ref{eq:merge}); the policy thus only moves the absorber/absorbee boundary, keeping the compress-not-discard behavior of \ours{}. Given the full Key vector $k_i$, the policy predicts a logit-space correction:
 \begin{equation}

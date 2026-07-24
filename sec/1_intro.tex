@@ -3,6 +3,13 @@
 
 When reading a document page, humans essentially do two things at once. The first is \emph{ordered reading}: following the natural reading order of the layout to serialize a two-dimensional page into a one-dimensional semantic sequence. The second is \emph{adaptive attention allocation}: under a limited attention budget, people first fixate on the regions that carry the most information---text, formulas, tables, and structural boundaries---while giving lower priority to blank margins, line spacing, paper texture, and background. Crucially, these low-priority cues are not thrown away but folded into coarser contextual impressions rather than read character by character: after finishing a page we rarely recall the exact background texture, yet can still tell whether it was yellowed or plain white---skimmed and compressed, not discarded. It is the interplay of ordered reading and adaptive attention allocation that lets people read complex pages efficiently with limited cognitive resources.
 
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\linewidth]{figures/final/overall.pdf}
+\caption{1}
+\label{fig:1}
+\end{figure*}
+
 Interestingly, these two behaviors map onto two facets of end-to-end document VLMs. By mapping a full page image directly to structured output, such VLMs realize \emph{ordered reading} for free through autoregressive decoding: they produce results in reading order without separate detection or ordering modules, which is precisely what justifies drawing the human-reading analogy for document parsing.
 
 However, VLMs inherit only the first half of human reading and largely drop the second---\emph{adaptive attention allocation}. A high-resolution page can yield thousands of visual tokens, and a large fraction come from blank margins and low-information background, yet every token consumes the same ViT and LLM computation as a token covering text or a formula. This uniform computation is fundamentally mismatched with the highly non-uniform information distribution of a document. To our knowledge, how to let an end-to-end document VLM perform such adaptive attention allocation from within itself has been largely unexplored---this is the missing half we address.
